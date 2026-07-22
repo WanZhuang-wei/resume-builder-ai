@@ -1,0 +1,58 @@
+ <h2>Phase 2 整体架构</h2>
+ <p class="subtitle">桌面截图采集工具 ─ Python 本地服务桥接方案</p>
+
+ <div class="section">
+   <div class="mockup" style="margin-bottom:20px">
+     <div class="mockup-header">系统架构概览</div>
+     <div class="mockup-body" style="text-align:left;padding:16px;line-height:1.8">
+       <div style="background:#e3f2fd;border:2px solid #1976d2;border-radius:8px;padding:12px;margin-bottom:12px;text-align:center">
+         <strong>🔵 Python 桌面采集工具</strong><br>
+         <span style="font-size:13px;color:#555">截图 / OCR / AI解析 / 临时知识库</span>
+       </div>
+       <div style="text-align:center;font-size:20px;margin:4px 0">⬇ ⬆ HTTP REST API (localhost:8765)</div>
+       <div style="background:#fff3e0;border:2px solid #f57c00;border-radius:8px;padding:12px;margin-bottom:12px;text-align:center">
+         <strong>🟠 Vue 前端应用 (现有)</strong><br>
+         <span style="font-size:13px;color:#555">AI 问答 / 岗位分析 / 简历生成 / 知识库面板</span>
+       </div>
+     </div>
+   </div>
+ </div>
+
+ <div class="section">
+   <h3>核心组件</h3>
+   <div class="cards">
+     <div class="card" onclick="toggleSelect(this)" data-choice="a">
+       <div class="card-body">
+         <h3>截图引擎</h3>
+         <p>全局快捷键触发截图 / 区域自动轮询截图 / 系统托盘常驻</p>
+       </div>
+     </div>
+     <div class="card" onclick="toggleSelect(this)" data-choice="b">
+       <div class="card-body">
+         <h3>OCR + AI 解析流水线</h3>
+         <p>截图→OCR文字识别→DeepSeek API解析为结构化岗位信息</p>
+       </div>
+     </div>
+     <div class="card" onclick="toggleSelect(this)" data-choice="c">
+       <div class="card-body">
+         <h3>临时知识库</h3>
+         <p>本机SQLite存储采集到的岗位数据，支持导出/清理/批量分析</p>
+       </div>
+     </div>
+   </div>
+ </div>
+
+ <div class="section">
+   <h3>数据流</h3>
+   <div class="mockup">
+     <div class="mockup-body" style="padding:12px;font-size:13px;line-height:2">
+       ① 用户按 <strong>Ctrl+Shift+S</strong> → 截图选框出现<br>
+       ② 框选招聘网站上的岗位信息 → Python 截取该区域<br>
+       ③ OCR (Tesseract) 提取文字 → AI 解析为结构化数据<br>
+       ④ 写入本地 SQLite → 通过 REST API 通知前端<br>
+       ⑤ 前端更新知识库面板 → 用户开始分析匹配度
+     </div>
+   </div>
+ </div>
+
+ <p class="subtitle" style="margin-top:20px">看看这个架构是否符合你的预期？下一步我细化每个模块的设计。</p>

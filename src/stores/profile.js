@@ -1,0 +1,148 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import db from '@/db'
+
+export const useProfileStore = defineStore('profile', () => {
+  const basicInfo = ref(null)
+  const workExperiences = ref([])
+  const education = ref([])
+  const projects = ref([])
+  const skills = ref([])
+  const certificates = ref([])
+  const loaded = ref(false)
+
+  const completeness = computed(() => {
+    let score = 0
+    const total = 6
+    if (basicInfo.value?.name) score++
+    if (workExperiences.value.length > 0) score++
+    if (education.value.length > 0) score++
+    if (projects.value.length > 0) score++
+    if (skills.value.length > 0) score++
+    if (certificates.value.length > 0) score++
+    return Math.round((score / total) * 100)
+  })
+
+  const summaryData = computed(() => ({
+    basicInfo: basicInfo.value,
+    workExperiences: workExperiences.value,
+    education: education.value,
+    projects: projects.value,
+    skills: skills.value,
+    certificates: certificates.value
+  }))
+
+  async function loadAll() {
+    basicInfo.value = (await db.basicInfo.toArray())[0] || null
+    workExperiences.value = await db.workExperiences.toArray()
+    education.value = await db.education.toArray()
+    projects.value = await db.projects.toArray()
+    skills.value = await db.skills.toArray()
+    certificates.value = await db.certificates.toArray()
+    loaded.value = true
+  }
+
+  // Basic Info
+  async function saveBasicInfo(info) {
+    await db.basicInfo.clear()
+    await db.basicInfo.add(info)
+    basicInfo.value = info
+  }
+
+  // Work Experiences
+  async function addWorkExperience(exp) {
+    const id = await db.workExperiences.add(exp)
+    workExperiences.value.push({ ...exp, id })
+  }
+
+  async function updateWorkExperience(id, exp) {
+    await db.workExperiences.update(id, exp)
+    const idx = workExperiences.value.findIndex(e => e.id === id)
+    if (idx >= 0) workExperiences.value[idx] = { ...exp, id }
+  }
+
+  async function deleteWorkExperience(id) {
+    await db.workExperiences.delete(id)
+    workExperiences.value = workExperiences.value.filter(e => e.id !== id)
+  }
+
+  // Education
+  async function addEducation(edu) {
+    const id = await db.education.add(edu)
+    education.value.push({ ...edu, id })
+  }
+
+  async function updateEducation(id, edu) {
+    await db.education.update(id, edu)
+    const idx = education.value.findIndex(e => e.id === id)
+    if (idx >= 0) education.value[idx] = { ...edu, id }
+  }
+
+  async function deleteEducation(id) {
+    await db.education.delete(id)
+    education.value = education.value.filter(e => e.id !== id)
+  }
+
+  // Projects
+  async function addProject(proj) {
+    const id = await db.projects.add(proj)
+    projects.value.push({ ...proj, id })
+  }
+
+  async function updateProject(id, proj) {
+    await db.projects.update(id, proj)
+    const idx = projects.value.findIndex(p => p.id === id)
+    if (idx >= 0) projects.value[idx] = { ...proj, id }
+  }
+
+  async function deleteProject(id) {
+    await db.projects.delete(id)
+    projects.value = projects.value.filter(p => p.id !== id)
+  }
+
+  // Skills
+  async function addSkill(skill) {
+    const id = await db.skills.add(skill)
+    skills.value.push({ ...skill, id })
+  }
+
+  async function updateSkill(id, skill) {
+    await db.skills.update(id, skill)
+    const idx = skills.value.findIndex(s => s.id === id)
+    if (idx >= 0) skills.value[idx] = { ...skill, id }
+  }
+
+  async function deleteSkill(id) {
+    await db.skills.delete(id)
+    skills.value = skills.value.filter(s => s.id !== id)
+  }
+
+  // Certificates
+  async function addCertificate(cert) {
+    const id = await db.certificates.add(cert)
+    certificates.value.push({ ...cert, id })
+  }
+
+  async function updateCertificate(id, cert) {
+    await db.certificates.update(id, cert)
+    const idx = certificates.value.findIndex(c => c.id === id)
+    if (idx >= 0) certificates.value[idx] = { ...cert, id }
+  }
+
+  async function deleteCertificate(id) {
+    await db.certificates.delete(id)
+    certificates.value = certificates.value.filter(c => c.id !== id)
+  }
+
+  return {
+    basicInfo, workExperiences, education, projects, skills, certificates,
+    loaded, completeness, summaryData,
+    loadAll,
+    saveBasicInfo,
+    addWorkExperience, updateWorkExperience, deleteWorkExperience,
+    addEducation, updateEducation, deleteEducation,
+    addProject, updateProject, deleteProject,
+    addSkill, updateSkill, deleteSkill,
+    addCertificate, updateCertificate, deleteCertificate
+  }
+})
