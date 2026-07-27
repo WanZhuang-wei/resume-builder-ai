@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-container">
     <router-view v-if="isHrView" />
     <template v-else>
@@ -12,13 +12,13 @@
         <router-view />
       </div>
       <div class="page-footer">
-        <van-tabbar v-model="active" route active-color="#1989fa" border>
-          <van-tabbar-item to="/dashboard" icon="home-o">首页</van-tabbar-item>
-          <van-tabbar-item to="/jobs" icon="search">岗位</van-tabbar-item>
-          <van-tabbar-item to="/profile" icon="contact">资料</van-tabbar-item>
-          <van-tabbar-item to="/resume" icon="description">简历</van-tabbar-item>
-          <van-tabbar-item to="/chat" icon="chat-o">问答</van-tabbar-item>
-          <van-tabbar-item to="/import" icon="file-o">导入</van-tabbar-item>
+        <van-tabbar v-model="active" active-color="#1989fa" border>
+          <van-tabbar-item icon="home-o" @click="navigate('/dashboard')">首页</van-tabbar-item>
+          <van-tabbar-item icon="search" @click="navigate('/jobs')">岗位</van-tabbar-item>
+          <van-tabbar-item icon="contact" @click="navigate('/profile')">资料</van-tabbar-item>
+          <van-tabbar-item icon="description" @click="navigate('/resume')">简历</van-tabbar-item>
+          <van-tabbar-item icon="chat-o" @click="navigate('/chat')">问答</van-tabbar-item>
+          <van-tabbar-item icon="file-o" @click="navigate('/import')">导入</van-tabbar-item>
         </van-tabbar>
       </div>
     </template>
@@ -26,16 +26,17 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onMounted } from 'vue'
 import { useProfileStore } from '@/stores/profile'
-import { registerJobRoutes } from '@/router/jobRoutes'
+import { metrics } from '@/utils/metrics'
 
 const route = useRoute()
 const router = useRouter()
 const profileStore = useProfileStore()
 
+const TAB_PATHS = ['/dashboard', '/jobs', '/profile', '/resume', '/chat', '/import']
 const active = ref(0)
 
 const isHrView = computed(() => route.path.startsWith('/hr/'))
@@ -46,9 +47,26 @@ function goSettings() {
   router.push('/settings')
 }
 
-onMounted(() => {
+function navigate(path) {
+  router.push(path)
+}
+
+onMounted(async () => {
+  // 等待初始路由解析完成（根路径 → dashboard 重定向）
+  await router.isReady()
+  // 同步底部标签高亮与当前路由
+  const idx = TAB_PATHS.indexOf(route.path)
+  if (idx >= 0) active.value = idx
+
   profileStore.loadAll()
-  registerJobRoutes(router)
+  metrics.loadPersisted()
+  window.addEventListener('beforeunload', () => { metrics.persist() })
+})
+
+// 监听后续路由变化，自动同步高亮
+watch(() => route.path, (path) => {
+  const idx = TAB_PATHS.indexOf(path)
+  active.value = idx >= 0 ? idx : -1
 })
 </script>
 
