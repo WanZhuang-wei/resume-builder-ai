@@ -107,7 +107,7 @@ export function calculateDualScore(keywordScore, aiScore = null) {
 }
 
 /**
- * 根据分数返回匹配度标签
+ * 根据分数返回匹配度标签 (含数字等级)
  */
 export function getMatchLabelV2(score) {
   if (score >= 80) return { text: "完美匹配", color: "#07c160", level: 5 };
@@ -116,6 +116,7 @@ export function getMatchLabelV2(score) {
   if (score >= 25) return { text: "较低匹配", color: "#ff6b6b", level: 2 };
   return { text: "暂不匹配", color: "#ccc", level: 1 };
 }
+
 
 
 // ===== 以下函数由 git 历史恢复 =====
@@ -201,4 +202,6 @@ export function buildJobsSystemPrompt(jobContext) {
   ).join("\n\n")
   return "\n\n【岗位数据库信息】\n以下是为用户推荐的岗位列表：\n" + jobList + "\n\n你可以基于这些信息回答关于求职方向、技能要求、行业发展等问题。"
 }
+
+
 
