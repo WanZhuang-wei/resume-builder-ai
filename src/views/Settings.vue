@@ -49,6 +49,8 @@
       </van-cell-group>
       <input type="file" ref="fileInput" accept=".json" style="display:none" @change="handleFileSelect" />
     </div>
+
+    <MetricsDashboard full />
   </div>
 </template>
 
@@ -59,6 +61,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { exportAllData, importData, readFileAsText } from '@/utils/backup'
 import { chat } from '@/api/deepseek'
+import MetricsDashboard from '@/components/MetricsDashboard.vue'
 
 const settingsStore = useSettingsStore()
 const knowledgeStore = useKnowledgeStore()
@@ -85,7 +88,6 @@ async function testConnection() {
   testing.value = true
   testResult.value = ''
   try {
-    // 保存后再测试
     settingsStore.setApiKey(apiKey.value)
     const response = await chat([
       { role: 'user', content: '回复"连接成功"四个字' }

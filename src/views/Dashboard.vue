@@ -78,7 +78,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { showToast, showDialog } from 'vant'
+import { showToast, showDialog, closeToast } from 'vant'
 import { useProfileStore } from '@/stores/profile'
 import { getApiKey } from '@/api/deepseek'
 import { useRouter } from 'vue-router'
@@ -124,20 +124,34 @@ function onApiKeySaved() {
 async function showConsolidateResult() {
   showToast({ message: '正在分析整理...', duration: 0 })
   try {
-    const result = await profileStore.consolidateAll()
-    showToast.clear()
+    const result = await profileStore.consolidateWithKnowledge()
+    closeToast()
     if (!result.hasChanges) {
       showToast('未发现重复资料，资料已是最佳状态')
       return
     }
     await showDialog({
       title: '整理完成',
-      message: result.summary.join('\n'),
-      confirmButtonText: '知道了'
+      message: result.summary.join('\n') + '\n\n点击“导出”保存整理后的资料',
+      confirmButtonText: '知道了',
+      showCancelButton: true,
+      cancelButtonText: '导出 JSON',
+      onCancel: function() { profileStore.exportData('json') }
     })
+    // After dialog closes, offer MD export
+    const mdResult = await showDialog({
+      title: '导出 Markdown',
+      message: '是否同时导出一份 Markdown 格式的简历？',
+      confirmButtonText: '导出 MD',
+      showCancelButton: true,
+      cancelButtonText: '不用了'
+    })
+    if (mdResult === 'confirm') {
+      profileStore.exportData('markdown')
+    }
     showToast('资料已整理完成')
   } catch (e) {
-    showToast.clear()
+    closeToast()
     showToast('整理失败: ' + e.message)
   }
 }

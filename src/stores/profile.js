@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import db from '@/db'
 import { consolidateProfile } from '@/utils/consolidator'
+import { clusterDocuments } from '@/utils/document-merger'
+import { consolidateWithAI } from '@/utils/consolidate-v2'
+import { exportJSON, exportMarkdown } from '@/utils/exportProfiler'
+import { useKnowledgeStore } from '@/stores/knowledge'
 
 export const useProfileStore = defineStore('profile', () => {
   const basicInfo = ref(null)
@@ -173,10 +177,53 @@ export const useProfileStore = defineStore('profile', () => {
 
     return result
   }
+  async function consolidateWithKnowledge() {
+    const knowledgeStore = useKnowledgeStore()
+    if (!knowledgeStore.loaded) await knowledgeStore.loadAll()
+
+    let clusters = []
+    let skipped = 0
+
+    if (knowledgeStore.items.length > 0) {
+      const docResult = clusterDocuments(knowledgeStore.items)
+      clusters = docResult.clusters
+      skipped = docResult.skipped
+    }
+
+    // If no clusters from documents or knowledge base is empty, fallback to old method
+    if (clusters.length === 0 || knowledgeStore.items.length === 0) {
+      return consolidateAll()
+    }
+
+    const aiResult = await consolidateWithAI(clusters, { summaryData: summaryData.value }, {})
+    const summary = aiResult.summary
+
+    if (skipped > 0) summary.push(skipped + " 篇文档因内容过短已跳过")
+
+    return { hasChanges: summary.length > 0, summary: summary }
+  }
+
+  function exportData(format) {
+    const data = {
+      basicInfo: basicInfo.value,
+      workExperiences: workExperiences.value,
+      education: education.value,
+      projects: projects.value,
+      skills: skills.value,
+      certificates: certificates.value
+    }
+    if (format === "json") {
+      exportJSON(data)
+    } else if (format === "markdown") {
+      exportMarkdown(data)
+    }
+  }
   return {
     basicInfo, workExperiences, education, projects, skills, certificates,
     loaded, completeness, summaryData,
     consolidateAll,
+    consolidateWithKnowledge,
+    exportData,
     loadAll,
     saveBasicInfo,
     addWorkExperience, updateWorkExperience, deleteWorkExperience,
@@ -186,5 +233,6 @@ export const useProfileStore = defineStore('profile', () => {
     addCertificate, updateCertificate, deleteCertificate
   }
 })
+
 
 
