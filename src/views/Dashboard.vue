@@ -127,16 +127,22 @@ async function showConsolidateResult() {
     const result = await profileStore.consolidateWithKnowledge()
     closeToast()
     if (!result.hasChanges) {
-      showToast('未发现重复资料，资料已是最佳状态')
+      const msg = result.summary.length > 0 ? result.summary.join('\n') : '未发现重复资料'
+      showToast(msg)
       return
     }
-    const action = await showDialog({
-      title: '整理完成',
-      message: result.summary.join('\n'),
-      confirmButtonText: '导出 Word 简历',
-      showCancelButton: true,
-      cancelButtonText: '返回'
-    })
+    let action
+    try {
+      action = await showDialog({
+        title: '整理完成',
+        message: result.summary.join('\n'),
+        confirmButtonText: '导出 Word 简历',
+        showCancelButton: true,
+        cancelButtonText: '返回'
+      })
+    } catch (e) {
+      action = e
+    }
     if (action === 'confirm') {
       profileStore.exportData('word')
       showToast('已导出 Word 文档')

@@ -191,30 +191,37 @@ export const useProfileStore = defineStore('profile', () => {
     }
 
     // If no clusters from documents or knowledge base is empty, fallback to old method
+    // 没有找到重复文档簇 → 不做任何操作
     if (clusters.length === 0 || knowledgeStore.items.length === 0) {
-      return consolidateAll()
+      return { hasChanges: false, summary: [] }
     }
 
     const aiResult = await consolidateWithAI(clusters, { summaryData: summaryData.value }, {})
-    const summary = aiResult.summary
+    const summary = aiResult.summary || []
+    let hasChanges = false
+    let writeCount = 0
 
     // 将 AI 合并结果写入 store
     if (aiResult.workExperiences && aiResult.workExperiences.length > 0) {
       await db.workExperiences.clear()
       await db.workExperiences.bulkAdd(aiResult.workExperiences)
       workExperiences.value = aiResult.workExperiences
-      summary.push("已更新工作经历")
+      writeCount += aiResult.workExperiences.length
+      hasChanges = true
     }
     if (aiResult.projects && aiResult.projects.length > 0) {
       await db.projects.clear()
       await db.projects.bulkAdd(aiResult.projects)
       projects.value = aiResult.projects
-      summary.push("已更新项目经验")
+      writeCount += aiResult.projects.length
+      hasChanges = true
     }
 
+    if (writeCount > 0) summary.push("已更新 " + writeCount + " 条记录")
     if (skipped > 0) summary.push(skipped + " 篇文档因内容过短已跳过")
+    if (!hasChanges) summary.push("文档中未发现需要合并的重复内容")
 
-    return { hasChanges: summary.length > 0, summary: summary }
+    return { hasChanges: hasChanges, summary: summary }
   }
 
   function exportData(format) {
