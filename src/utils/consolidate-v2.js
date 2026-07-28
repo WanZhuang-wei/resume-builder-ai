@@ -31,6 +31,8 @@ export async function consolidateWithAI(clusters, profileStore, opts) {
   const signal = options.signal
   const summary = []
 
+  const mergedWorkExp = []
+  const mergedProj = []
   const toMerge = clusters.slice(0, MAX_AI_CLUSTERS)
   const remaining = clusters.slice(MAX_AI_CLUSTERS)
 
@@ -68,5 +70,5 @@ export async function consolidateWithAI(clusters, profileStore, opts) {
     summary.push("还有 " + remaining.length + " 组因数量限制未处理")
   }
 
-  return { summary: summary, hasChanges: summary.length > 0 }
+  return { summary: summary, hasChanges: summary.length > 0, workExperiences: mergedWorkExp, projects: mergedProj }
 }

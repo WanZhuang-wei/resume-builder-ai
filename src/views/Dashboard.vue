@@ -130,26 +130,19 @@ async function showConsolidateResult() {
       showToast('未发现重复资料，资料已是最佳状态')
       return
     }
-    await showDialog({
+    const action = await showDialog({
       title: '整理完成',
-      message: result.summary.join('\n') + '\n\n点击“导出”保存整理后的资料',
-      confirmButtonText: '知道了',
+      message: result.summary.join('\n'),
+      confirmButtonText: '导出 Word 简历',
       showCancelButton: true,
-      cancelButtonText: '导出 JSON',
-      onCancel: function() { profileStore.exportData('json') }
+      cancelButtonText: '返回'
     })
-    // After dialog closes, offer MD export
-    const mdResult = await showDialog({
-      title: '导出 Markdown',
-      message: '是否同时导出一份 Markdown 格式的简历？',
-      confirmButtonText: '导出 MD',
-      showCancelButton: true,
-      cancelButtonText: '不用了'
-    })
-    if (mdResult === 'confirm') {
-      profileStore.exportData('markdown')
+    if (action === 'confirm') {
+      profileStore.exportData('word')
+      showToast('已导出 Word 文档')
+    } else {
+      showToast('资料已整理完成')
     }
-    showToast('资料已整理完成')
   } catch (e) {
     closeToast()
     showToast('整理失败: ' + e.message)

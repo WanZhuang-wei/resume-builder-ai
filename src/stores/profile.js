@@ -4,7 +4,7 @@ import db from '@/db'
 import { consolidateProfile } from '@/utils/consolidator'
 import { clusterDocuments } from '@/utils/document-merger'
 import { consolidateWithAI } from '@/utils/consolidate-v2'
-import { exportJSON, exportMarkdown } from '@/utils/exportProfiler'
+import { exportWord } from '@/utils/exportProfiler'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
 export const useProfileStore = defineStore('profile', () => {
@@ -198,6 +198,20 @@ export const useProfileStore = defineStore('profile', () => {
     const aiResult = await consolidateWithAI(clusters, { summaryData: summaryData.value }, {})
     const summary = aiResult.summary
 
+    // 将 AI 合并结果写入 store
+    if (aiResult.workExperiences && aiResult.workExperiences.length > 0) {
+      await db.workExperiences.clear()
+      await db.workExperiences.bulkAdd(aiResult.workExperiences)
+      workExperiences.value = aiResult.workExperiences
+      summary.push("已更新工作经历")
+    }
+    if (aiResult.projects && aiResult.projects.length > 0) {
+      await db.projects.clear()
+      await db.projects.bulkAdd(aiResult.projects)
+      projects.value = aiResult.projects
+      summary.push("已更新项目经验")
+    }
+
     if (skipped > 0) summary.push(skipped + " 篇文档因内容过短已跳过")
 
     return { hasChanges: summary.length > 0, summary: summary }
@@ -212,10 +226,8 @@ export const useProfileStore = defineStore('profile', () => {
       skills: skills.value,
       certificates: certificates.value
     }
-    if (format === "json") {
-      exportJSON(data)
-    } else if (format === "markdown") {
-      exportMarkdown(data)
+    if (format === "word") {
+      exportWord(data)
     }
   }
   return {
@@ -233,6 +245,7 @@ export const useProfileStore = defineStore('profile', () => {
     addCertificate, updateCertificate, deleteCertificate
   }
 })
+
 
 
 
