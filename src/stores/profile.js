@@ -1,6 +1,7 @@
-import { defineStore } from 'pinia'
+﻿import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import db from '@/db'
+import { consolidateProfile } from '@/utils/consolidator'
 
 export const useProfileStore = defineStore('profile', () => {
   const basicInfo = ref(null)
@@ -134,9 +135,48 @@ export const useProfileStore = defineStore('profile', () => {
     certificates.value = certificates.value.filter(c => c.id !== id)
   }
 
+  async function consolidateAll() {
+    const result = consolidateProfile({
+      workExperiences: workExperiences.value,
+      projects: projects.value,
+      skills: skills.value,
+      certificates: certificates.value,
+      education: education.value
+    })
+
+    if (!result.hasChanges) return result
+
+    // 更新工作经历
+    await db.workExperiences.clear()
+    await db.workExperiences.bulkAdd(result.workExperiences)
+    workExperiences.value = result.workExperiences
+
+    // 更新项目
+    await db.projects.clear()
+    await db.projects.bulkAdd(result.projects)
+    projects.value = result.projects
+
+    // 更新技能
+    await db.skills.clear()
+    await db.skills.bulkAdd(result.skills)
+    skills.value = result.skills
+
+    // 更新证书
+    await db.certificates.clear()
+    await db.certificates.bulkAdd(result.certificates)
+    certificates.value = result.certificates
+
+    // 更新教育
+    await db.education.clear()
+    await db.education.bulkAdd(result.education)
+    education.value = result.education
+
+    return result
+  }
   return {
     basicInfo, workExperiences, education, projects, skills, certificates,
     loaded, completeness, summaryData,
+    consolidateAll,
     loadAll,
     saveBasicInfo,
     addWorkExperience, updateWorkExperience, deleteWorkExperience,
@@ -146,3 +186,5 @@ export const useProfileStore = defineStore('profile', () => {
     addCertificate, updateCertificate, deleteCertificate
   }
 })
+
+

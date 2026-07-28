@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="dashboard">
     <ApiKeyDialog v-model="showApiDialog" @saved="onApiKeySaved" />
 
@@ -55,10 +55,13 @@
         <van-grid-item icon="file-o" text="自动填写" @click="checkApiThen('/import')" />
         <van-grid-item icon="share-o" text="分享简历" @click="$router.push('/share')" />
         <van-grid-item icon="setting-o" text="设置" @click="$router.push('/settings')" />
+        <van-grid-item icon="records" text="一键整理" @click="showConsolidateResult" />
       </van-grid>
     </div>
 
     <JobRecommendWidget />
+
+    <MetricsDashboard />
 
     <div v-if="profileStore.completeness < 100" class="section-card">
       <div class="section-title">完善建议</div>
@@ -75,13 +78,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { showToast } from 'vant'
+import { showToast, showDialog } from 'vant'
 import { useProfileStore } from '@/stores/profile'
 import { getApiKey } from '@/api/deepseek'
 import { useRouter } from 'vue-router'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import JobRecommendWidget from '@/components/JobRecommendWidget.vue'
 import { useJobsStore } from '@/stores/jobs'
+import MetricsDashboard from '@/components/MetricsDashboard.vue'
 
 const profileStore = useProfileStore()
 const router = useRouter()
@@ -116,6 +120,29 @@ function onApiKeySaved() {
   }
 }
 
+
+async function showConsolidateResult() {
+  const loading = showToast({ message: '正在分析整理...', duration: 0 })
+  try {
+    const result = await profileStore.consolidateAll()
+    loading.clear()
+    if (!result.hasChanges) {
+      showToast('未发现重复资料，资料已是最佳状态')
+      return
+    }
+    await showDialog({
+      title: '整理完成',
+      message: result.summary.join('\n'),
+      confirmButtonText: '知道了'
+    })
+    showToast('资料已整理完成')
+  } catch (e) {
+    loading.clear()
+    showToast('整理失败: ' + e.message)
+  }
+}
+
+
 onMounted(() => {
   if (!profileStore.loaded) profileStore.loadAll()
   jobsStore.initJobData()
@@ -142,3 +169,4 @@ onMounted(() => {
 .stat-num { font-size: 22px; font-weight: 700; color: #1989fa; }
 .stat-label { font-size: 12px; color: #999; margin-top: 2px; }
 </style>
+
