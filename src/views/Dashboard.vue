@@ -122,10 +122,10 @@ function onApiKeySaved() {
 
 
 async function showConsolidateResult() {
-  const loading = showToast({ message: '正在分析整理...', duration: 0 })
+  showToast({ message: '正在分析整理...', duration: 0 })
   try {
     const result = await profileStore.consolidateAll()
-    loading.clear()
+    showToast.clear()
     if (!result.hasChanges) {
       showToast('未发现重复资料，资料已是最佳状态')
       return
@@ -137,7 +137,7 @@ async function showConsolidateResult() {
     })
     showToast('资料已整理完成')
   } catch (e) {
-    loading.clear()
+    showToast.clear()
     showToast('整理失败: ' + e.message)
   }
 }
