@@ -49,6 +49,8 @@ import { ref, onMounted } from "vue"
 import { showToast } from "vant"
 import { useRouter } from "vue-router"
 import db from "@/db"
+import { extractJobInfo, getApiKey } from "@/api/deepseek"
+import { logAction } from "@/utils/actionLog"
 
 const router = useRouter()
 const form = ref({ company: "", position: "", salary: "", city: "", jd: "" })
@@ -66,7 +68,7 @@ async function loadJobs() {
     arr.reverse()
     jobs.value = arr.map(function (item) {
       let data = (typeof item.parsedJson === "string") ? JSON.parse(item.parsedJson) : (item.parsedJson || {})
-      return { id: item.id, company: data.company || "", position: data.position || "", salary: data.salary || "", jd: data.jd || "", createdAt: item.createdAt }
+      return { id: item.id, company: data.company || "", position: data.position || "", salary: data.salary || "", city: data.city || "", jd: data.jd || "", createdAt: item.createdAt }
     })
   } catch (e) {
     console.warn("load error", e)
@@ -77,12 +79,14 @@ async function saveJob() {
   if (!form.value.position.trim()) { showToast("请填写岗位名称"); return }
   saving.value = true
   try {
-    const jobData = { source: "manual", company: form.value.company, position: form.value.position, salary: form.value.salary, jd: form.value.jd }
+    const jobData = { source: "manual", company: form.value.company, position: form.value.position, salary: form.value.salary, city: form.value.city, jd: form.value.jd }
     await db.collectedJobs.add({ sourceId: "m_" + Date.now(), parsedJson: JSON.stringify(jobData), createdAt: new Date().toISOString() })
     showToast("已保存")
+    logAction("jobCollector.save", { status: "success", payload: { position: form.value.position, hasJd: !!form.value.jd } })
     form.value = { company: "", position: "", salary: "", city: "", jd: "" }
     await loadJobs()
   } catch (e) { showToast("保存失败：" + e.message)
+    logAction("jobCollector.save", { status: "failed", error: e })
   } finally { saving.value = false }
 }
 
@@ -90,15 +94,24 @@ async function parseWithAI() {
   if (!form.value.jd.trim()) { showToast("请先粘贴JD文本"); return }
   parsing.value = true
   try {
-    const lines = form.value.jd.trim().split("\n").filter(Boolean)
-    for (const line of lines) {
-      const t = line.replace(/^[#*\\-\\s]+/, "").trim()
-      if (t.length > 1 && t.length < 30 && !form.value.position && /工程师|开发|设计|经理|运营|产品|测试/.test(t)) {
-        form.value.position = t
-      }
+    if (!getApiKey()) {
+      showToast("请先配置 API Key")
+      logAction("jobCollector.aiParse", { status: "failed", payload: { reason: "missing_api_key" } })
+      return
     }
-    showToast("已尝试提取")
-  } catch (e) { showToast("解析失败")
+    logAction("jobCollector.aiParse", { status: "started", payload: { jdLength: form.value.jd.length } })
+    const info = await extractJobInfo(form.value.jd)
+    Object.assign(form.value, {
+      company: info.company || form.value.company,
+      position: info.position || form.value.position,
+      salary: info.salary || form.value.salary,
+      city: info.city || form.value.city
+    })
+    showToast("AI 提取完成")
+    logAction("jobCollector.aiParse", { status: "success", payload: info })
+  } catch (e) {
+    showToast("解析失败：" + e.message)
+    logAction("jobCollector.aiParse", { status: "failed", error: e })
   } finally { parsing.value = false }
 }
 
@@ -112,6 +125,7 @@ async function deleteJob(index) {
   await db.collectedJobs.delete(item.id)
   jobs.value.splice(index, 1)
   showToast("已删除")
+  logAction("jobCollector.delete", { status: "success", payload: { index } })
 }
 
 function formatDate(d) {

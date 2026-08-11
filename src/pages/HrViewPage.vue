@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="hr-view" v-if="data">
     <!-- Contact Info Header -->
     <HrInfoCard
@@ -64,7 +64,7 @@
 
     <!-- AI Chat Section -->
     <div class="hr-chat-section">
-      <HrChatBox :context="data.profile" />
+      <HrChatBox :context="data.profile" :share-id="shareId" />
     </div>
 
     <div class="hr-footer">
@@ -73,8 +73,8 @@
   </div>
 
   <div v-else class="loading-page">
-    <van-loading type="spinner" size="24" />
-    <p>加载中...</p>
+    <van-loading v-if="loading" type="spinner" size="24" />
+    <p>{{ loading ? '加载中...' : loadError }}</p>
   </div>
 </template>
 
@@ -84,20 +84,69 @@ import { useRoute } from 'vue-router'
 import { decompressData } from '@/utils/compress'
 import HrInfoCard from '@/components/HrInfoCard.vue'
 import HrChatBox from '@/components/HrChatBox.vue'
+import { useShareStore } from '@/stores/share'
+import { logAction } from '@/utils/actionLog'
 
+// 本地开发时用 .env 的 VITE_SHARE_API，部署后与前端同源
+const SHARE_API = import.meta.env.VITE_SHARE_API || window.location.origin
 const route = useRoute()
 const data = ref(null)
+const loading = ref(true)
+const shareStore = useShareStore()
+const loadError = ref('')
+const shareId = ref('')
 
-onMounted(() => {
-  const encoded = route.params.data
-  if (encoded) {
-    const decoded = decompressData(encoded)
-    if (decoded && decoded.profile) {
-      data.value = decoded
-    } else {
-      // Show error
-      data.value = { profile: { basicInfo: { name: '链接异常' } }, contact: {} }
+onMounted(async () => {
+  const param = route.params.data
+  shareId.value = param
+  if (!param) {
+    loading.value = false
+    loadError.value = '无效的分享链接'
+    return
+  }
+
+  // Step 1: 尝试从分享服务器获取（新短链接）
+  let loaded = false
+  try {
+    const res = await fetch(SHARE_API + '/api/share/' + param)
+    if (res.ok) {
+      const decoded = await res.json()
+      if (decoded && decoded.profile) {
+        data.value = decoded
+        loaded = true
+      }
     }
+  } catch (e) {
+    console.warn('[hr] server fetch failed:', e.message)
+  }
+
+  // Step 2: 降级 — 旧版压缩链接（兼容已分享的旧链接）
+  if (!loaded) {
+    try {
+      const decoded = decompressData(param)
+      if (decoded && decoded.profile) {
+        data.value = decoded
+        loaded = true
+      }
+    } catch (e2) {
+      console.warn('[hr] local decompress also failed', e2)
+    }
+  }
+
+  if (loaded) {
+    shareStore.incrementViewCount(param)
+    logAction('hrView.load', { status: 'success', payload: { token: param } })
+  } else {
+    logAction('hrView.load', { status: 'failed', payload: { token: param } })
+  }
+
+  loading.value = false
+
+  if (!loaded) {
+    loadError.value = data.value && data.value.profile?.basicInfo?.name === '链接异常'
+      ? '链接异常或已过期'
+      : '无法加载分享内容'
+    data.value = null
   }
 })
 </script>

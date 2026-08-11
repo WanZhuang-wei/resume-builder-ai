@@ -3,6 +3,14 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/__tests__/**/*.test.js'],
+    coverage: {
+      reporter: ['text', 'lcov'],
+      include: ['src/utils/metrics.js']
+    }
+  },
   plugins: [
     vue(),
     VitePWA({

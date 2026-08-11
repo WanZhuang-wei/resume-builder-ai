@@ -1,164 +1,116 @@
- # 项目结构文档 — 简历生成助手
- 
- > 自动生成于: 2026-07-12
- > 项目路径: `D:\workspace\project002_简历生成助手`
- 
- ## 目录结构
- 
- ```
- D:\workspace\project002_简历生成助手/
- │
- ├── .npmrc                          # npm 镜像源配置
- ├── index.html                      # Vite 入口 HTML
- ├── package.json                    # 项目依赖与脚本
- ├── vite.config.js                  # Vite + Vue 构建配置
- ├── package-lock.json               # 依赖锁定文件
- ├── start.bat                       # 一键启动脚本（双击运行）
- │
- ├── public/
- │   └── pwa-icons/                  # PWA 图标资源
- │
- ├── src/                            # ★ 源代码目录
- │   ├── main.js                     # Vue 应用入口（组件注册）
- │   ├── App.vue                     # 根组件（导航 + 页面框架）
- │   │
- │   ├── api/
- │   │   ├── deepseek.js             # DeepSeek API 封装（对话/简历/分析/HR问答）
- │   │   └── extract.js              # AI 文档内容提取（自动填写核心）
- │   │
- │   ├── components/
- │   │   ├── HrChatBox.vue           # HR 聊天对话框（支持知识库上下文）
- │   │   ├── HrInfoCard.vue          # HR 信息卡片组件
- │   │   └── ResumeTemplate.vue      # 简历模板渲染组件
- │   │
- │   ├── db/
- │   │   └── index.js                # IndexedDB 数据库层（含 knowledgeBase 表）
- │   │
- │   ├── pages/
- │   │   └── HrViewPage.vue          # HR 视角专用页面
- │   │
- │   ├── router/
- │   │   └── index.js                # Vue Router 路由定义
- │   │
- │   ├── stores/
- │   │   ├── profile.js              # 个人信息 Pinia store
- │   │   ├── resume.js               # 简历数据 Pinia store
- │   │   ├── settings.js             # 应用设置 Pinia store
- │   │   ├── share.js                # 分享功能 Pinia store
- │   │   └── knowledge.js            # 知识库 Pinia store（文档管理 + HR上下文）
- │   │
- │   ├── utils/
- │   │   ├── backup.js               # 数据备份与恢复工具
- │   │   ├── compress.js             # 数据压缩工具
- │   │   ├── export.js               # 导出（PDF/图片）工具
- │   │   └── parser.js               # 文档解析工具（PDF/DOCX/TXT → 纯文本）
- │   │
- │   └── views/
- │       ├── AiChat.vue              # AI 智能聊天页面
- │       ├── Dashboard.vue           # 仪表盘首页（含 API Key 提示横幅）
- │       ├── DocumentUpload.vue      # 文档上传 + AI 自动填写页面 ★新增
- │       ├── JobAnalyzer.vue         # 职位需求分析页面
- │       ├── ProfileEditor.vue       # 个人信息编辑页面
- │       ├── ResumeBuilder.vue       # 简历构建/编辑页面
- │       ├── Settings.vue            # 设置页面（含 Key 测试连接）
- │       └── ShareProfile.vue        # 简历分享页面
- │
- ├── dist/                           # 构建产物（生产环境）
- └── node_modules/                   # 依赖包
- ```
- 
- ## 使用说明
- 
- ### 1. 环境要求
- - Node.js >= 18
- - npm >= 9
- 
- ### 2. 安装依赖
- ```bash
- npm install
- ```
- 
- ### 3. 一键启动（推荐）
- 双击项目根目录下的 **`start.bat`**，即可自动启动开发服务器并打开浏览器。
- 
- ### 4. 手动启动
- ```bash
- npm run start
- ```
- 
- ### 5. 标准开发模式
- ```bash
- npm run dev
- ```
- 
- ### 6. 生产构建
- ```bash
- npm run build
- ```
- 
- ### 7. 开始使用
- 1. 打开应用 → 点击首页顶栏 ⚙️ 齿轮图标 → **设置**
- 2. 在设置页填入 DeepSeek API Key → 保存 → 点"测试连接"验证
- 3. 回到首页，前往"资料"页面填写个人信息
- 4. 或者到"导入"页，上传简历/毕业设计/项目文档，AI 自动提取并填入
- 5. 然后去"简历"页用 AI 生成简历，去"问答"页进行求职咨询
- 
- ## 路由说明
- 
- | 路由路径 | 页面组件 | 功能说明 |
- |----------|----------|----------|
- | `/` → `/dashboard` | Dashboard.vue | 仪表盘首页，总览简历数据 |
- | `/profile` | ProfileEditor.vue | 编辑个人信息 |
- | `/resume` | ResumeBuilder.vue | 构建和编辑简历 |
- | `/chat` | AiChat.vue | AI 智能辅助对话 |
- | `/analyze` | JobAnalyzer.vue | 职位需求分析 |
- | `/import` | DocumentUpload.vue | 文档上传 + AI 自动填写 ★ |
- | `/share` | ShareProfile.vue | 分享简历 |
- | `/settings` | Settings.vue | 应用设置 |
- | `/hr/:data` | HrViewPage.vue | HR 视角查看简历 |
- 
- ## 底部导航
- 
- 首页 → 资料 → 简历 → 问答 → 导入
- 
- 顶栏右侧 ⚙️ 齿轮图标 → 设置页
- 
- ## 数据存储
- - **Dexie.js (IndexedDB)** — 浏览器本地存储
- - 表格：`basicInfo`, `workExperiences`, `education`, `projects`, `skills`, `certificates`, `resumes`, `shareConfigs`, `chatHistory`, `knowledgeBase`
- 
- ## 功能模块
- 
- ### AI 问答
- - 基于 DeepSeek API，支持普通对话和流式输出
- - 自动注入个人资料作为上下文
- 
- ### 岗位分析
- - 输入 JD，AI 逐项分析匹配度，生成行动建议
- 
- ### 自动填写 ★新增
- - 支持 PDF / DOCX / TXT 格式上传
- - AI 智能提取基本信息、工作经历、教育、项目、技能
- - 一键填入个人资料
- - 补充信息自动存入知识库
- - HR 查看时可查阅知识库内容
- 
- ### HR 视角
- - 通过分享链接查看简历
- - 内置 AI 问答，支持知识库文档检索
- 
- ## 技术栈
- - **框架**: Vue 3 (Composition API)
- - **构建**: Vite
- - **状态管理**: Pinia
- - **路由**: Vue Router
- - **UI 库**: Vant
- - **AI 接口**: DeepSeek API
- - **本地存储**: Dexie.js (IndexedDB)
- - **PWA**: Workbox
- - **文档解析**: pdfjs-dist + mammoth
- - **导出**: html2canvas + html2pdf.js
- 
- ## 维护说明
- 1. 每次新增/删除/重命名文件后，请运行此 skill 更新 `STRUCTURE.md`
- 2. `node_modules/` 和 `dist/` 为构建产物，不纳入版本控制
+# Project Structure: 简历生成助手 (Resume Builder AI)
+
+> 自动生成于 2026-07-27
+> 项目路径: D:\workspace\project002_简历生成助手
+
+## 目录结构
+
+```
+D:\workspace\project002_简历生成助手
+├── docs/                                # 项目文档
+│   ├── frontend-audit-2026-08-02.md     # 前端功能断链审计与反馈机制方案
+│   ├── quantitative-design.md           # 量化体系设计方案
+│   ├── quantitative-plan.md             # 量化落地工作方案
+│   └── experiment-log.md                # 实验记录(Phase1-4)
+├── public/pwa-icons/                    # PWA 图标
+├── src/                                 # 源码目录 ★
+│   ├── main.js                          # Vue 入口
+│   ├── App.vue                          # 根组件(导航+框架)
+│   ├── api/
+│   │   ├── deepseek.js                  # DeepSeek API封装(含metrics打点)
+│   │   └── extract.js                   # AI文档内容提取
+│   ├── components/
+│   │   ├── MetricsDashboard.vue         # ★量化指标面板(紧凑/完整双模式)
+│   │   └── ...                          # 其他UI组件
+│   ├── db/                              # IndexedDB数据层
+│   ├── pages/
+│   │   └── HrViewPage.vue              # HR视角查看页面(含viewCount)
+│   ├── router/
+│   │   ├── index.js                     # Vue Router(含路由计时打点)
+│   │   └── jobRoutes.js                 # 岗位相关路由
+│   ├── stores/
+│   │   ├── resume.js                    # 简历store(含编辑追踪)
+│   │   ├── share.js                     # 分享store(含viewCount)
+│   │   └── ...                          # 其他Pinia stores
+│   ├── utils/
+│   │   ├── actionLog.js                 # 操作日志(可导出/清空)
+│   │   ├── metrics.js                   # ★核心: MetricsCollector采集器
+│   │   ├── parser.js                    # 文档解析(含metrics打点+estimateAccuracy)
+│   │   ├── jobMatcher.js               # ★双引擎匹配度评分(Jaccard+AI)
+│   │   ├── atsScorer.js                # ★ATS兼容性评分(12维度)
+│   │   ├── compress.js                  # 数据压缩
+│   │   ├── backup.js                    # 数据备份
+│   │   └── __tests__/                   # ★★9个测试文件,57个测试
+│   │       ├── actionLog.test.js        # 操作日志持久化/导出测试
+│   │       ├── metrics.test.js          # MetricsCollector核心测试
+│   │       ├── deepseek-metrics.test.js # API打点测试
+│   │       ├── parser-router-metrics.test.js # 解析+路由测试
+│   │       ├── jobMatcher.test.js       # 双引擎匹配测试
+│   │       ├── phase2-metrics.test.js   # 准确率+Pinia测试
+│   │       ├── phase2-demo.test.js      # Phase2集成验证
+│   │       ├── phase4-metrics.test.js   # 历史快照+ATS评分测试
+│   │       └── atsScorer.test.js        # ATS评分测试
+│   └── views/                           # 页面组件
+├── e2e/
+│   └── perf-baseline.js                 # Playwright性能基线脚本
+├── test-results/                        # 测试产物目录
+├── vite.config.js                       # Vite配置(含vitest)
+└── package.json                         # 项目配置
+```
+
+## 路由表
+
+| 路径 | 页面组件 | 功能 |
+|------|----------|------|
+| `/` → `/dashboard` | Dashboard.vue | 仪表盘首页(含MetricsDashboard卡片) |
+| `/jobs` → `/collect` | JobCollector.vue | 岗位采集(重定向) |
+| `/dashboard` | Dashboard.vue | 仪表盘首页 |
+| `/profile` | ProfileEditor.vue | 编辑个人信息 |
+| `/resume` | ResumeBuilder.vue | 构建和编辑简历 |
+| `/chat` | AiChat.vue | AI智能辅助对话 |
+| `/analyze` | JobAnalyzer.vue | 岗位需求分析 |
+| `/collect` | JobCollector.vue | 岗位采集 |
+| `/import` | DocumentUpload.vue | 文档上传+自动填写 |
+| `/share` | ShareProfile.vue | 分享简历 |
+| `/settings` | Settings.vue | 应用设置(含MetricsDashboard完整面板) |
+| `/hr/:data` | HrViewPage.vue | HR视角查看简历 |
+
+## 导航
+
+首页 → 资料 → 简历 → 问答 → 导入
+
+## 量化系统架构
+
+```
+用户操作 → 采集打点(Phase1) → 匹配评分(Phase2) → 可视化面板(Phase3)
+     │           │                    │                    │
+     │    metrics.recordApiCall()     │                    │
+     │    metrics.recordParse()       │                    │
+     │    metrics.recordGeneration()  ├─ jobMatcher.js     ├─ Dashboard.vue(紧凑)
+     │    metrics.recordRoute()       ├─ atsScorer.js      ├─ Settings.vue(完整)
+     │                                ├─ estimateAccuracy  └─ exportMarkdown
+     │                                └─ saveSnapshot(历史)
+     └─ localStorage持久化 ← ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
+```
+
+## 测试
+
+| 命令 | 说明 |
+|------|------|
+| `npm test` | 运行57个单元测试 |
+| `npm run test:watch` | 持续监听模式 |
+| `npm run test:coverage` | 覆盖率报告 |
+| `node e2e/perf-baseline.js` | Playwright性能基线 |
+| `powershell -File _run_playwright.ps1` | Playwright功能闭环测试(17项) |
+
+## 技术栈
+
+- **框架**: Vue 3 (Composition API)
+- **构建**: Vite 6 + vitest
+- **UI**: Vant 4
+- **状态**: Pinia
+- **路由**: Vue Router (Hash)
+- **AI**: DeepSeek API
+- **存储**: Dexie.js (IndexedDB)
+- **PWA**: Workbox
+- **测试**: Vitest + jsdom + Playwright

@@ -3,9 +3,21 @@ import { ref, computed } from 'vue'
 import db from '@/db'
 import { consolidateProfile } from '@/utils/consolidator'
 import { clusterDocuments } from '@/utils/document-merger'
-import { consolidateWithAI } from '@/utils/consolidate-v2'
+import { groupProfileEntries, mergeEntryGroups } from '@/utils/consolidate-v2'
 import { exportWord } from '@/utils/exportProfiler'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { backupNow } from '@/utils/dataGuard'
+
+function toSafeRecord(entry) {
+  try {
+    const cleaned = JSON.parse(JSON.stringify(entry))
+    if (!cleaned || typeof cleaned !== 'object' || Array.isArray(cleaned)) return null
+    delete cleaned._source
+    return cleaned
+  } catch {
+    return null
+  }
+}
 
 export const useProfileStore = defineStore('profile', () => {
   const basicInfo = ref(null)
@@ -177,52 +189,112 @@ export const useProfileStore = defineStore('profile', () => {
 
     return result
   }
-  async function consolidateWithKnowledge() {
-    const knowledgeStore = useKnowledgeStore()
-    if (!knowledgeStore.loaded) await knowledgeStore.loadAll()
+    async function consolidateWithKnowledge() {
+      const knowledgeStore = useKnowledgeStore()
+      if (!knowledgeStore.loaded) await knowledgeStore.loadAll()
+      try {
+        await backupNow()
+      } catch (e) {
+        // backup failure should not block consolidation
+      }
 
-    let clusters = []
-    let skipped = 0
+      const candidates = {
+        workExperiences: [],
+        projects: [],
+        skills: [],
+        certificates: [],
+        education: []
+      }
+      for (const item of knowledgeStore.items) {
+        const data = item.extractedData
+        if (!data) continue
+        if (Array.isArray(data.workExperiences)) candidates.workExperiences.push(...data.workExperiences.map(e => ({ ...e, _source: 'doc:' + item.id })))
+        if (Array.isArray(data.projects)) candidates.projects.push(...data.projects.map(p => ({ ...p, _source: 'doc:' + item.id })))
+        if (Array.isArray(data.skills)) candidates.skills.push(...data.skills.map(s => ({ ...s, _source: 'doc:' + item.id })))
+        if (Array.isArray(data.certificates)) candidates.certificates.push(...data.certificates.map(c => ({ ...c, _source: 'doc:' + item.id })))
+        if (Array.isArray(data.education)) candidates.education.push(...data.education.map(e => ({ ...e, _source: 'doc:' + item.id })))
+      }
 
-    if (knowledgeStore.items.length > 0) {
-      const docResult = clusterDocuments(knowledgeStore.items)
-      clusters = docResult.clusters
-      skipped = docResult.skipped
+      const totalCandidates = Object.values(candidates).reduce((sum, arr) => sum + arr.length, 0)
+      if (totalCandidates === 0 && knowledgeStore.items.length === 0) {
+        return { hasChanges: false, summary: ['\u77e5\u8bc6\u5e93\u4e3a\u7a7a\uff0c\u65e0\u6587\u6863\u53ef\u6574\u7406'] }
+      }
+      if (totalCandidates === 0) {
+        return { hasChanges: false, summary: ['\u77e5\u8bc6\u5e93\u6587\u6863\u6ca1\u6709\u53ef\u63d0\u53d6\u7684\u7b80\u5386\u6761\u76ee'] }
+      }
+
+      const current = {
+        workExperiences: workExperiences.value.map(e => ({ ...e, _source: 'existing' })),
+        projects: projects.value.map(p => ({ ...p, _source: 'existing' })),
+        skills: skills.value.map(s => ({ ...s, _source: 'existing' })),
+        certificates: certificates.value.map(c => ({ ...c, _source: 'existing' })),
+        education: education.value.map(e => ({ ...e, _source: 'existing' }))
+      }
+
+      const kindOrder = ['workExperiences', 'projects', 'skills', 'certificates', 'education']
+      const kindLabels = {
+        workExperiences: '\u5de5\u4f5c\u7ecf\u5386',
+        projects: '\u9879\u76ee',
+        skills: '\u6280\u80fd',
+        certificates: '\u8bc1\u4e66',
+        education: '\u6559\u80b2\u80cc\u666f'
+      }
+      const dbTables = {
+        workExperiences: db.workExperiences,
+        projects: db.projects,
+        skills: db.skills,
+        certificates: db.certificates,
+        education: db.education
+      }
+      const refs = {
+        workExperiences: workExperiences,
+        projects: projects,
+        skills: skills,
+        certificates: certificates,
+        education: education
+      }
+
+      const summary = []
+      let hasChanges = false
+
+      for (const kind of kindOrder) {
+        const all = [...current[kind], ...candidates[kind]]
+        if (all.length === 0) continue
+
+        const groups = groupProfileEntries(all, kind)
+        const mergeable = groups.filter(g => g.length > 1)
+        let finalEntries
+        let kindMerged = 0
+        if (mergeable.length > 0) {
+          const result = await mergeEntryGroups(groups, kind, { maxGroups: 8 })
+          finalEntries = result.entries
+          kindMerged = result.mergedCount
+          summary.push(...result.summary)
+        } else {
+          finalEntries = all
+        }
+
+        const cleanEntries = finalEntries.map(toSafeRecord).filter(Boolean)
+        if (finalEntries.length > 0 && cleanEntries.length === 0) {
+          summary.push('\u300c' + kindLabels[kind] + '\u300d\u6570\u636e\u683c\u5f0f\u5f02\u5e38\uff0c\u5df2\u8df3\u8fc7')
+          continue
+        }
+        const originalCount = current[kind].length
+        const changed = kindMerged > 0 || cleanEntries.length !== originalCount
+        if (!changed) continue
+
+        await dbTables[kind].clear()
+        await dbTables[kind].bulkAdd(cleanEntries)
+        refs[kind].value = cleanEntries
+        hasChanges = true
+        if (cleanEntries.length > originalCount) {
+          summary.push('\u5df2\u8865\u5145 ' + (cleanEntries.length - originalCount) + ' \u6761' + kindLabels[kind])
+        }
+      }
+
+      if (!hasChanges) summary.push('\u672a\u53d1\u73b0\u9700\u8981\u6574\u7406\u7684\u91cd\u590d\u6216\u53ef\u8865\u5145\u6761\u76ee')
+      return { hasChanges: hasChanges, summary: summary }
     }
-
-    // If no clusters from documents or knowledge base is empty, fallback to old method
-    // 没有找到重复文档簇 → 不做任何操作
-    if (clusters.length === 0 || knowledgeStore.items.length === 0) {
-      return { hasChanges: false, summary: [] }
-    }
-
-    const aiResult = await consolidateWithAI(clusters, { summaryData: summaryData.value }, {})
-    const summary = aiResult.summary || []
-    let hasChanges = false
-    let writeCount = 0
-
-    // 将 AI 合并结果写入 store
-    if (aiResult.workExperiences && aiResult.workExperiences.length > 0) {
-      await db.workExperiences.clear()
-      await db.workExperiences.bulkAdd(aiResult.workExperiences)
-      workExperiences.value = aiResult.workExperiences
-      writeCount += aiResult.workExperiences.length
-      hasChanges = true
-    }
-    if (aiResult.projects && aiResult.projects.length > 0) {
-      await db.projects.clear()
-      await db.projects.bulkAdd(aiResult.projects)
-      projects.value = aiResult.projects
-      writeCount += aiResult.projects.length
-      hasChanges = true
-    }
-
-    if (writeCount > 0) summary.push("已更新 " + writeCount + " 条记录")
-    if (skipped > 0) summary.push(skipped + " 篇文档因内容过短已跳过")
-    if (!hasChanges) summary.push("文档中未发现需要合并的重复内容")
-
-    return { hasChanges: hasChanges, summary: summary }
-  }
 
   function exportData(format) {
     const data = {
@@ -252,6 +324,7 @@ export const useProfileStore = defineStore('profile', () => {
     addCertificate, updateCertificate, deleteCertificate
   }
 })
+
 
 
 

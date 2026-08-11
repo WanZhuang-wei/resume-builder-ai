@@ -1,0 +1,19 @@
+{
+  "name": "resume-builder",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": "dist",
+  "nodeVersion": "22.11.0",
+  "rewrites": [
+    {
+      "source": "/*",
+      "destination": "/index.html"
+    }
+  ],
+  "cloudFunctions": {
+    "mainlandRegions": ["ap-guangzhou"],
+    "nodejs": {
+      "maxDuration": 10
+    }
+  }
+}

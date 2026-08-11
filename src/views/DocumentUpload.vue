@@ -139,6 +139,7 @@ import { parseDocument, checkFileSize } from '@/utils/parser'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useProfileStore } from '@/stores/profile'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
+import { logAction } from '@/utils/actionLog'
 
 const knowledgeStore = useKnowledgeStore()
 const profileStore = useProfileStore()
@@ -205,8 +206,10 @@ async function processFile(file) {
       })
     }
     showSuccessToast('信息提取完成')
+    logAction('documentUpload.processFile', { status: 'success', payload: { fileName: currentFileName.value, hasData: hasExtractedData(extractedData.value) } })
   } catch (e) {
     console.error('[DocumentUpload] Error:', e)
+    logAction('documentUpload.processFile', { status: 'failed', payload: { fileName: currentFileName.value }, error: e })
     const msg = e.message || ''
     // 分区定位错误来源
     if (msg.includes('API Key') || msg.includes('api_key')) {
@@ -217,6 +220,9 @@ async function processFile(file) {
       showToast({ message: msg, type: 'fail' })
     } else if (msg.includes('提取文字') || msg.includes('内容过少')) {
       showToast({ message: '文件内容过少或无法提取文字', type: 'fail' })
+    } else if (msg.includes('Authentication') || msg.includes('invalid') || msg.includes('api key')) {
+      showToast({ message: 'API Key 无效或已过期，请到设置页重新配置', type: 'fail' })
+      logAction('documentUpload.invalidApiKey', { status: 'failed', error: e })
     } else if (msg.includes('AI') || msg.includes('DeepSeek') || msg.includes('API') || msg.includes('HTTP') || msg.includes('fetch')) {
       showToast({ message: 'AI 分析失败: ' + msg.slice(0, 80), type: 'fail' })
     } else if (msg.includes('mammoth') || msg.includes('import') || msg.includes('动态导入')) {
@@ -311,8 +317,10 @@ async function applyToProfile() {
     await profileStore.loadAll()
     if (failCount === 0) { showSuccessToast('已成功填入个人资料') }
     else { showToast({ message: '填入完成，' + successCount + ' 项成功，' + failCount + ' 项失败', type: 'warning' }) }
+    logAction('documentUpload.applyToProfile', { status: failCount === 0 ? 'success' : 'partial', payload: { successCount, failCount } })
   } catch (e) {
     showToast({ message: '写入失败: ' + e.message, type: 'fail' })
+    logAction('documentUpload.applyToProfile', { status: 'failed', error: e })
   } finally { applying.value = false }
 }
 
@@ -323,8 +331,10 @@ async function reapplyFromCache(id) {
     const result = await knowledgeStore.reapplyToProfile(id, profileStore)
     if (result.failCount === 0) { showSuccessToast('已从缓存重新填入') }
     else { showToast({ message: '重新填入完成，' + result.successCount + ' 项成功，' + result.failCount + ' 项失败', type: 'warning' }) }
+    logAction('documentUpload.reapply', { status: result.failCount === 0 ? 'success' : 'partial', payload: { successCount: result.successCount, failCount: result.failCount } })
   } catch (e) {
     showToast({ message: '重新填入失败: ' + e.message, type: 'fail' })
+    logAction('documentUpload.reapply', { status: 'failed', error: e })
   } finally { reapplyingId.value = null }
 }
 
@@ -332,6 +342,7 @@ async function deleteKnowledge(id) {
   await knowledgeStore.deleteItem(id)
   if (expandedId.value === id) expandedId.value = null
   showToast('已删除')
+  logAction('documentUpload.deleteKnowledge', { status: 'success', payload: { id } })
 }
 
 function resetAll() { extractedData.value = null; currentFileName.value = '' }

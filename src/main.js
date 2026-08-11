@@ -1,9 +1,12 @@
-import { createApp } from 'vue'
+﻿import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
-import { Button, Form, Field, Cell, CellGroup, Tag, Tab, Tabs, Tabbar, TabbarItem, Grid, GridItem, Icon, Checkbox, CheckboxGroup, Loading, Dialog, Toast, Uploader, ActionSheet, Radio, RadioGroup, Sticky } from 'vant'
+import { installGlobalErrorHandlers } from '@/utils/actionLog'
+import { Button, Form, Field, Cell, CellGroup, Tag, Tab, Tabs, Tabbar, TabbarItem, Grid, GridItem, Icon, Checkbox, CheckboxGroup, Loading, Dialog, Toast, Uploader, ActionSheet, Radio, RadioGroup, Sticky, Progress } from 'vant'
 import 'vant/lib/index.css'
+
+installGlobalErrorHandlers()
 
 const app = createApp(App)
 app.use(Button)
@@ -29,6 +32,8 @@ app.use(ActionSheet)
 app.use(Radio)
 app.use(RadioGroup)
 app.use(Sticky)
+app.use(Progress)
 app.use(createPinia())
 app.use(router)
 app.mount('#app')
+

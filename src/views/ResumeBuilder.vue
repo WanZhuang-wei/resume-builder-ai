@@ -82,6 +82,7 @@ import { exportPDF } from '@/utils/export'
 import ResumeTemplate from '@/components/ResumeTemplate.vue'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import { exportDocx } from '@/utils/exportDocx'
+import { logAction } from '@/utils/actionLog'
 import * as mammoth from 'mammoth'
 
 const resumeStore = useResumeStore()
@@ -125,14 +126,19 @@ async function startGenerate() {
 
 async function doGenerate() {
   if (!profileStore.loaded) await profileStore.loadAll()
-  await resumeStore.generate(
-    profileStore.summaryData,
-    targetCompany.value || '',
-    targetPosition.value,
-    jobDescription.value.trim() || undefined,
-    templateText.value || undefined
-  )
-  showToast('简历已生成')
+  try {
+    await resumeStore.generate(
+      profileStore.summaryData,
+      targetCompany.value || '',
+      targetPosition.value,
+      jobDescription.value.trim() || undefined,
+      templateText.value || undefined
+    )
+    showToast('简历已生成')
+  } catch (e) {
+    showToast('生成失败：' + e.message)
+    logAction('resume.view.generate', { status: 'failed', payload: { targetPosition: targetPosition.value }, error: e })
+  }
 }
 
 async function confirmGenerateWithoutJd() {
@@ -155,6 +161,7 @@ async function exportPdf() {
     showToast('导出成功')
   } catch (e) {
     showToast('导出失败：' + e.message)
+    logAction('resume.view.exportPdf', { status: 'failed', error: e })
   }
 }
 
@@ -180,6 +187,7 @@ async function handleTemplateUpload(file) {
     templateText.value = result.value
   } catch (e) {
     showToast('模板解析失败：' + e.message)
+    logAction('resume.view.parseTemplate', { status: 'failed', payload: { fileName: templateFileName.value }, error: e })
     templateText.value = ''
   }
 }
@@ -201,6 +209,7 @@ async function exportWord() {
     showToast('Word 导出成功')
   } catch (e) {
     showToast('导出失败：' + e.message)
+    logAction('resume.view.exportWord', { status: 'failed', error: e })
   }
 }
 

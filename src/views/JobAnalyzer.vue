@@ -21,12 +21,15 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import { useProfileStore } from '@/stores/profile'
 import { analyzeJob, getApiKey } from '@/api/deepseek'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
+import { logAction } from '@/utils/actionLog'
 
 const profileStore = useProfileStore()
+const route = useRoute()
 const jobDescription = ref('')
 const result = ref('')
 const loading = ref(false)
@@ -35,6 +38,10 @@ const pendingAction = ref(false)
 
 onMounted(() => {
   if (!profileStore.loaded) profileStore.loadAll()
+  if (route.query.jd) {
+    jobDescription.value = String(route.query.jd)
+    logAction('jobAnalyzer.jdFromQuery', { status: 'success', payload: { length: jobDescription.value.length } })
+  }
 })
 
 async function startAnalyze() {
@@ -48,8 +55,10 @@ async function startAnalyze() {
     if (!profileStore.loaded) await profileStore.loadAll()
     const res = await analyzeJob(profileStore.summaryData, jobDescription.value)
     result.value = res
+    logAction('jobAnalyzer.analyze', { status: 'success', payload: { jdLength: jobDescription.value.length } })
   } catch (e) {
     showToast('分析失败：' + e.message)
+    logAction('jobAnalyzer.analyze', { status: 'failed', error: e, payload: { jdLength: jobDescription.value.length } })
   } finally {
     loading.value = false
   }

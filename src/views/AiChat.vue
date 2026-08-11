@@ -62,6 +62,7 @@ import { buildJobsSystemPrompt } from '@/utils/jobMatcher'
 import { useJobsStore } from '@/stores/jobs'
 import { useResumeStore } from '@/stores/resume'
 import db from '@/db/index'
+import { logAction } from '@/utils/actionLog'
 
 const profileStore = useProfileStore()
 const jobsStore = useJobsStore()
@@ -93,8 +94,10 @@ onMounted(async () => {
       .toArray()
     if (history.length > 0) {
       messages.value = history.reverse().map(h => ({
+        id: h.id,
         role: h.role,
-        content: h.content
+        content: h.content,
+        _meta: h.meta || undefined
       }))
       hasMoreHistory.value = history.length >= 50
     }
@@ -112,15 +115,19 @@ onMounted(async () => {
   await scrollToBottom()
 })
 
-async function saveMessage(role, content) {
+async function saveMessage(role, content, meta) {
   try {
-    await db.chatHistory.add({
+    const id = await db.chatHistory.add({
       role,
       content,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      meta: meta || null
     })
+    return id
   } catch (e) {
     console.warn('保存消息失败', e)
+    logAction('aiChat.saveMessage', { status: 'failed', payload: { role }, error: e })
+    return null
   }
 }
 
@@ -156,9 +163,10 @@ async function sendMessage() {
   }
 
   inputText.value = ''
+  logAction('aiChat.send', { status: 'started', payload: { textLength: text.length } })
 
-  await saveMessage('user', text)
-  messages.value.push({ role: 'user', content: text })
+  const userId = await saveMessage('user', text)
+  messages.value.push({ id: userId, role: 'user', content: text })
   await scrollToBottom()
 
   loading.value = true
@@ -175,12 +183,14 @@ async function sendMessage() {
     ]
     const response = await chat(chatMessages, { maxTokens: 1500 })
 
-    await saveMessage('assistant', response)
-    messages.value.push({ role: 'assistant', content: response })
+    const assistantId = await saveMessage('assistant', response)
+    messages.value.push({ id: assistantId, role: 'assistant', content: response })
+    logAction('aiChat.send', { status: 'success', payload: { messageCount: messages.value.length } })
   } catch (e) {
     const errMsg = '抱歉，处理时遇到问题：' + e.message
     await saveMessage('assistant', errMsg)
-    messages.value.push({ role: 'assistant', content: errMsg })
+    messages.value.push({ id: null, role: 'assistant', content: errMsg })
+    logAction('aiChat.send', { status: 'failed', error: e })
   } finally {
     loading.value = false
     await scrollToBottom()
@@ -200,8 +210,10 @@ async function loadMoreHistory() {
       .toArray()
     if (more.length > 0) {
       const newMsgs = more.reverse().map(h => ({
+        id: h.id,
         role: h.role,
-        content: h.content
+        content: h.content,
+        _meta: h.meta || undefined
       }))
       messages.value = [...newMsgs, ...messages.value]
     }
@@ -220,8 +232,10 @@ async function clearAllHistory() {
     messages.value = []
     hasMoreHistory.value = false
     showToast('历史记录已清空')
+    logAction('aiChat.clearHistory', { status: 'success' })
   } catch (e) {
     showToast('清空失败：' + e.message)
+    logAction('aiChat.clearHistory', { status: 'failed', error: e })
   }
 }
 
@@ -241,22 +255,18 @@ function exportChat() {
   a.click()
   URL.revokeObjectURL(url)
   showToast('对话已导出')
+  logAction('aiChat.exportChat', { status: 'success', payload: { messageCount: messages.value.length } })
 }
 
 async function deleteSingleMessage(index) {
   const msg = messages.value[index]
   if (!msg || msg.role === 'system') return
   try {
-    const records = await db.chatHistory
-      .where({ role: msg.role })
-      .filter(r => r.content === msg.content)
-      .toArray()
-    if (records.length > 0) {
-      await db.chatHistory.delete(records[records.length - 1].id)
-    }
+    if (msg.id) await db.chatHistory.delete(msg.id)
     messages.value.splice(index, 1)
   } catch (e) {
     console.warn('删除消息失败', e)
+    logAction('aiChat.deleteMessage', { status: 'failed', error: e })
   }
 }
 
@@ -288,7 +298,7 @@ async function handleResumeGenerate() {
 
 async function executeResumeGeneration(target, company, jd) {
   if (!getApiKey()) {
-    pendingMessage.value = '生成简历'
+    pendingResumeGeneration.value = { target, company, jd }
     showApiDialog.value = true
     return
   }
@@ -302,16 +312,19 @@ async function executeResumeGeneration(target, company, jd) {
 
     const markdownContent = '## 简历生成结果\n\n' + resumeContent + '\n\n---\n*你可以点击下方按钮保存此简历*'
 
-    await saveMessage('assistant', markdownContent)
+    const assistantId = await saveMessage('assistant', markdownContent, { type: 'resume', target, company, jd, content: resumeContent })
     messages.value.push({
+      id: assistantId,
       role: 'assistant',
       content: markdownContent,
       _meta: { type: 'resume', target, company, jd, content: resumeContent }
     })
+    logAction('aiChat.generateResume', { status: 'success', payload: { target, company, hasJd: !!jd } })
   } catch (e) {
     const errMsg = '生成简历失败：' + e.message
     await saveMessage('assistant', errMsg)
-    messages.value.push({ role: 'assistant', content: errMsg })
+    messages.value.push({ id: null, role: 'assistant', content: errMsg })
+    logAction('aiChat.generateResume', { status: 'failed', error: e })
   } finally {
     loading.value = false
     pendingResumeGeneration.value = null
@@ -340,6 +353,12 @@ async function saveResumeFromChat(meta) {
 }
 
 function onApiKeySaved() {
+  if (pendingResumeGeneration.value) {
+    const pending = pendingResumeGeneration.value
+    pendingResumeGeneration.value = null
+    executeResumeGeneration(pending.target, pending.company, pending.jd)
+    return
+  }
   if (pendingMessage.value) {
     inputText.value = pendingMessage.value
     pendingMessage.value = ''

@@ -1,1 +1,0 @@
-import{z as i,k as o}from"./index-ByXTObIT.js";const n=i("settings",()=>{const e=o(localStorage.getItem("deepseek_api_key")||""),a=o(localStorage.getItem("theme")||"light");function s(t){e.value=t,localStorage.setItem("deepseek_api_key",t)}function r(){e.value="",localStorage.removeItem("deepseek_api_key")}return{apiKey:e,theme:a,setApiKey:s,clearApiKey:r}});export{n as u};

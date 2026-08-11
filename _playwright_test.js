@@ -112,7 +112,59 @@ async function main() {
         }
       }
       await shot('07-navigation');
-    }]
+    }],
+    ['profile - save and restore', async () => {
+      await go('/profile');
+      const testName = 'QA\u6d4b\u8bd5' + Date.now();
+      const nameInput = page.locator('input[placeholder="\u8bf7\u8f93\u5165\u59d3\u540d"]');
+      await nameInput.fill(testName);
+      await page.getByRole('button', { name: '\u4fdd\u5b58\u57fa\u672c\u4fe1\u606f' }).click();
+      await page.waitForTimeout(800);
+      await page.reload({ waitUntil: 'networkidle' });
+      await go('/profile');
+      const value = await page.locator('input[placeholder="\u8bf7\u8f93\u5165\u59d3\u540d"]').inputValue();
+      check(value === testName, 'profile data restored after reload');
+    }],
+    ['collect - jd flows to analyzer', async () => {
+      await go('/collect');
+      const jd = '\u8d1f\u8d23\u524d\u7aef\u5f00\u53d1\uff0c\u9700\u8981\u638c\u63e1 Vue \u548c Node.js';
+      await page.locator('input[placeholder*="\u524d\u7aef\u5de5\u7a0b\u5e08"]').fill('\u524d\u7aef\u5de5\u7a0b\u5e08');
+      await page.locator('textarea[placeholder*="\u7c98\u8d34\u5c97\u4f4d\u63cf\u8ff0"]').fill(jd);
+      await page.getByRole('button', { name: '\u4fdd\u5b58\u5c97\u4f4d' }).click();
+      await page.waitForTimeout(800);
+      await page.locator('.item-actions button', { hasText: '\u5206\u6790' }).first().click();
+      await page.waitForTimeout(800);
+      const value = await page.locator('textarea').first().inputValue();
+      check(page.url().includes('/analyze'), 'redirect to analyzer');
+      check(value.includes('\u524d\u7aef\u5f00\u53d1'), 'jd auto filled');
+    }],
+    ['share - checkbox toggles once', async () => {
+      await go('/share');
+      const cell = page.locator('.van-cell', { hasText: '\u663e\u793a\u7535\u8bdd' }).first();
+      const icon = cell.locator('.van-checkbox__icon');
+      const wasChecked = await icon.evaluate(el => el.classList.contains('van-checkbox__icon--checked'));
+      await cell.click();
+      await page.waitForTimeout(300);
+      const afterCell = await icon.evaluate(el => el.classList.contains('van-checkbox__icon--checked'));
+      check(afterCell === !wasChecked, 'cell click toggles once');
+      await icon.click({ force: true });
+      await page.waitForTimeout(300);
+      const afterBox = await icon.evaluate(el => el.classList.contains('van-checkbox__icon--checked'));
+      check(afterBox === wasChecked, 'checkbox click toggles once');
+    }],
+    ['job - favorite persists', async () => {
+      await go('/job/' + encodeURIComponent('Python \u5f00\u53d1\u5de5\u7a0b\u5e08'));
+      await page.waitForTimeout(1000);
+      const addBtn = page.getByRole('button', { name: '\u6536\u85cf\u8be5\u5c97\u4f4d' }).first();
+      await addBtn.click();
+      await page.waitForTimeout(600);
+      const afterAdd = await page.getByRole('button', { name: '\u53d6\u6d88\u6536\u85cf' }).count();
+      check(afterAdd > 0, 'favorite button switches to cancel');
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(1000);
+      const afterReload = await page.getByRole('button', { name: '\u53d6\u6d88\u6536\u85cf' }).count();
+      check(afterReload > 0, 'favorite persists after reload');
+    }],
   ];
 
   for (const [name, fn] of tests) {

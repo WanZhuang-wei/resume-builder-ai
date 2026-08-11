@@ -44,10 +44,26 @@
       <div class="section-title">数据管理</div>
       <van-cell-group :border="false">
         <van-cell title="导出所有数据" is-link @click="handleExport" />
+        <van-cell title="备份到浏览器" is-link @click="handleBrowserBackup" />
+        <van-cell title="从浏览器备份恢复" is-link @click="handleBrowserRestore" />
         <van-cell title="导入数据" is-link @click="handleImport" />
         <van-cell title="清空知识库" is-link @click="handleClearKnowledge" />
       </van-cell-group>
       <input type="file" ref="fileInput" accept=".json" style="display:none" @change="handleFileSelect" />
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">????</div>
+      <div class="log-actions">
+        <van-button size="small" plain round icon="down" @click="handleExportActionLogs">?? JSON</van-button>
+        <van-button size="small" plain round icon="description" @click="handleExportActionLogsMarkdown">?? Markdown</van-button>
+        <van-button v-if="actionLogs.length" size="small" plain round type="danger" icon="delete" @click="handleClearActionLogs">??</van-button>
+        <van-button size="small" plain round icon="replay" @click="refreshActionLogs">??</van-button>
+      </div>
+      <div v-if="actionLogs.length === 0" class="empty-state"><p>?????????????????</p></div>
+      <van-cell-group v-else :border="false">
+        <van-cell v-for="log in actionLogs.slice(0, 20)" :key="log.id" :title="log.action" :label="formatLogMeta(log)" />
+      </van-cell-group>
     </div>
 
     <MetricsDashboard full />
@@ -59,9 +75,11 @@ import { ref, onMounted } from 'vue'
 import { showToast, showConfirmDialog, showSuccessToast, showFailToast } from 'vant'
 import { useSettingsStore } from '@/stores/settings'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { exportAllData, importData, readFileAsText } from '@/utils/backup'
+import { exportAllData, importData, readFileAsText, downloadFile } from '@/utils/backup'
 import { chat } from '@/api/deepseek'
 import MetricsDashboard from '@/components/MetricsDashboard.vue'
+import { backupNow, restoreFromBackup, getBackupInfo } from '@/utils/dataGuard'
+import { getRecentLogs, clearLogs, exportLogs, logAction } from '@/utils/actionLog'
 
 const settingsStore = useSettingsStore()
 const knowledgeStore = useKnowledgeStore()
@@ -71,6 +89,7 @@ const showKey = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const testResult = ref('')
+const actionLogs = ref([])
 
 function saveKey() {
   saving.value = true
@@ -148,8 +167,83 @@ async function handleClearKnowledge() {
   }).catch(() => {})
 }
 
+async function handleBrowserBackup() {
+  try {
+    await backupNow()
+    const info = getBackupInfo()
+    const time = info ? new Date(info.exportedAt).toLocaleString('zh-CN') : ''
+    showSuccessToast('已备份到浏览器' + (time ? '（' + time + '）' : ''))
+    logAction('settings.backupToBrowser', { status: 'success', payload: { exportedAt: info?.exportedAt } })
+  } catch (e) {
+    showFailToast('备份失败：' + e.message)
+    logAction('settings.backupToBrowser', { status: 'failed', error: e })
+  }
+}
+
+function handleBrowserRestore() {
+  const info = getBackupInfo()
+  if (!info) {
+    showFailToast('浏览器中没有备份')
+    return
+  }
+  showConfirmDialog({
+    title: '恢复浏览器备份',
+    message: '将覆盖当前本地数据，确定恢复？'
+  }).then(async () => {
+    try {
+      await restoreFromBackup()
+      showSuccessToast('恢复成功，请刷新页面')
+      logAction('settings.restoreFromBackup', { status: 'success' })
+    } catch (e) {
+      showFailToast('恢复失败：' + e.message)
+      logAction('settings.restoreFromBackup', { status: 'failed', error: e })
+    }
+  }).catch(() => {})
+}
+
+function refreshActionLogs() {
+  actionLogs.value = getRecentLogs(50)
+}
+
+function formatLogMeta(log) {
+  const time = new Date(log.ts).toLocaleString('zh-CN')
+  const error = log.error?.message ? ' | ' + log.error.message : ''
+  const duration = log.durationMs != null ? ' | ' + log.durationMs + 'ms' : ''
+  return time + ' | ' + (log.page || '-') + ' | ' + log.status + duration + error
+}
+
+function handleExportActionLogs() {
+  try {
+    downloadFile(exportLogs('json'), 'action-log-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json')
+    showSuccessToast('???????')
+  } catch (e) {
+    showFailToast('?????' + e.message)
+  }
+}
+
+function handleExportActionLogsMarkdown() {
+  try {
+    downloadFile(exportLogs('markdown'), 'action-log-' + new Date().toISOString().slice(0, 10) + '.md', 'text/markdown')
+    showSuccessToast('Markdown ???')
+  } catch (e) {
+    showFailToast('?????' + e.message)
+  }
+}
+
+function handleClearActionLogs() {
+  showConfirmDialog({
+    title: '??????',
+    message: '???????????????????'
+  }).then(() => {
+    clearLogs()
+    refreshActionLogs()
+    showSuccessToast('?????')
+  }).catch(() => {})
+}
+
 onMounted(() => {
   if (!knowledgeStore.loaded) knowledgeStore.loadAll()
+  refreshActionLogs()
 })
 </script>
 
@@ -157,6 +251,8 @@ onMounted(() => {
 .settings {
   padding-bottom: 20px;
 }
+
+.log-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 
 .api-section {
   border: 1px solid #e8f0fe;

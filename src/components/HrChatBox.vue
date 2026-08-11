@@ -9,7 +9,7 @@
       <div v-if="messages.length === 0" class="welcome-msg">
         <p>你好！我是候选人的智能助手</p>
         <p class="hint">你可以问我关于项目细节、工作经历等方面的问题</p>
-        <p class="hint">剩余提问次数：{{ 3 - questionCount }}/3</p>
+        <p class="hint">剩余提问次数：{{ maxQuestions - questionCount }}/{{ maxQuestions }}</p>
       </div>
       <div v-for="(msg, i) in messages" :key="i" :class="['msg-item', msg.role]">
         <div class="msg-content">{{ msg.content }}</div>
@@ -21,14 +21,14 @@
       </div>
     </div>
 
-    <div v-if="questionCount >= 3" class="limit-reached">
+    <div v-if="questionCount >= maxQuestions" class="limit-reached">
       <van-icon name="warning-o" />
-      <span>提问次数已用完，请联系候选人获取更多信息</span>
+      <span>提问次数已用完，请联系候选人刷新次数</span>
     </div>
 
     <div v-else class="chat-input">
       <van-field v-model="inputText" :disabled="loading" placeholder="输入你的问题..." @keypress.enter="sendMessage" :border="false" />
-      <van-button :loading="loading" icon="send-o" round size="small" type="primary" :disabled="questionCount >= 3" @click="sendMessage" />
+      <van-button :loading="loading" icon="send-o" round size="small" type="primary" :disabled="questionCount >= maxQuestions" @click="sendMessage" />
     </div>
   </div>
 </template>
@@ -38,13 +38,16 @@ import { ref, onMounted, nextTick, computed } from 'vue'
 import { showToast } from 'vant'
 import { chat, hrQuestion, buildHrSystemPrompt, getApiKey } from '@/api/deepseek'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { logAction } from '@/utils/actionLog'
 
 const props = defineProps({
   context: { type: Object, required: true },
-  apiKey: { type: String, default: '' }
+  apiKey: { type: String, default: '' },
+  shareId: { type: String, default: '' }
 })
 
 const knowledgeStore = useKnowledgeStore()
+const SHARE_API = import.meta.env.VITE_SHARE_API || 'http://localhost:3001'
 
 const messages = ref([])
 const inputText = ref('')
@@ -63,6 +66,7 @@ function getFingerprint() {
 }
 
 const questionCount = ref(getStoredCount())
+const maxQuestions = ref(3)
 
 function getStoredCount() {
   return parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10)
@@ -71,6 +75,51 @@ function getStoredCount() {
 function incrementCount() {
   questionCount.value++
   localStorage.setItem(STORAGE_KEY, String(questionCount.value))
+}
+
+async function loadServerStatus() {
+  if (!props.shareId) return
+  try {
+    const res = await fetch(`${SHARE_API}/api/share/${props.shareId}/status?hrKey=${getFingerprint()}`)
+    if (res.ok) {
+      const data = await res.json()
+      questionCount.value = data.count || 0
+      maxQuestions.value = data.max || 3
+      localStorage.setItem(STORAGE_KEY, String(questionCount.value))
+    }
+  } catch (e) {
+    logAction('hrChat.loadStatus', { status: 'failed', error: e })
+  }
+}
+
+async function reserveQuestion(text) {
+  if (!props.shareId) {
+    incrementCount()
+    return true
+  }
+  try {
+    const res = await fetch(`${SHARE_API}/api/share/${props.shareId}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hrKey: getFingerprint(), question: text })
+    })
+    if (res.status === 429) {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error || '提问次数已用完，请联系候选人刷新次数')
+      logAction('hrChat.reserveQuestion', { status: 'failed', payload: { reason: 'limit_reached' } })
+      return false
+    }
+    if (!res.ok) throw new Error('server ' + res.status)
+    const data = await res.json()
+    questionCount.value = (data.max || maxQuestions.value) - (data.remaining || 0)
+    maxQuestions.value = data.max || maxQuestions.value
+    localStorage.setItem(STORAGE_KEY, String(questionCount.value))
+    return true
+  } catch (e) {
+    logAction('hrChat.reserveQuestion', { status: 'failed', error: e, payload: { fallback: true } })
+    incrementCount()
+    return true
+  }
 }
 
 async function scrollToBottom() {
@@ -100,19 +149,22 @@ async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || loading.value) return
 
-  if (questionCount.value >= 3) {
-    showToast('提问次数已用完')
+  if (questionCount.value >= maxQuestions.value) {
+    showToast('提问次数已用完，请联系候选人刷新次数')
     return
   }
 
   if (!getApiKey() && !props.apiKey) {
     showToast('API 配置异常，请联系候选人')
+    logAction('hrChat.send', { status: 'failed', payload: { reason: 'no_api_key' } })
     return
   }
 
   inputText.value = ''
+  logAction('hrChat.send', { status: 'started', payload: { textLength: text.length } })
+  const reserved = await reserveQuestion(text)
+  if (!reserved) return
   messages.value.push({ role: 'user', content: text })
-  incrementCount()
   await scrollToBottom()
 
   loading.value = true
@@ -126,8 +178,10 @@ async function sendMessage() {
     ]
     const response = await chat(chatMessages, { maxTokens: 500 })
     messages.value.push({ role: 'assistant', content: response })
+    logAction('hrChat.send', { status: 'success', payload: { responseLength: response.length } })
   } catch (e) {
     messages.value.push({ role: 'assistant', content: '抱歉，回答时遇到问题：' + e.message })
+    logAction('hrChat.send', { status: 'failed', error: e })
   } finally {
     loading.value = false
     await scrollToBottom()
@@ -136,6 +190,7 @@ async function sendMessage() {
 
 onMounted(() => {
   if (!knowledgeStore.loaded) knowledgeStore.loadAll()
+  loadServerStatus()
 })
 </script>
 

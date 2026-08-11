@@ -1,7 +1,17 @@
-﻿node_modules/
+node_modules/
 dist/
 test-results/
 .vite/
 *.log
 .DS_Store
 Thumbs.db
+
+# env
+.env
+
+# share server
+server/node_modules/
+server/shares.json
+
+__pycache__/
+*.pyc

@@ -156,15 +156,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, watch } from 'vue'
 import { showToast } from 'vant'
+import { logAction } from '@/utils/actionLog'
 import { useProfileStore } from '@/stores/profile'
 
 const profileStore = useProfileStore()
 
 onMounted(() => {
   if (!profileStore.loaded) profileStore.loadAll()
-  if (profileStore.basicInfo) Object.assign(basic, profileStore.basicInfo)
 })
 
 const basic = reactive({
@@ -172,9 +172,14 @@ const basic = reactive({
   title: '', summary: '', targetPosition: ''
 })
 
+watch(() => profileStore.basicInfo, (val) => {
+  if (val) Object.assign(basic, val)
+}, { immediate: true })
+
 async function saveBasic() {
   await profileStore.saveBasicInfo({ ...basic })
   showToast('基本信息已保存')
+  logAction('profile.saveBasicInfo', { status: 'success', payload: { name: basic.name } })
 }
 
 // Work Experiences

@@ -4,6 +4,7 @@ import jobsDB from '@/db/jobsDB'
 import { allPositions } from '@/data/index'
 import { getTopMatches, getRandomMatches, computeMatchScore } from '@/utils/jobMatcher'
 import { useProfileStore } from '@/stores/profile'
+import { logAction } from '@/utils/actionLog'
 
 export const useJobsStore = defineStore('jobs', () => {
   const initialized = ref(false)
@@ -25,7 +26,8 @@ export const useJobsStore = defineStore('jobs', () => {
       favorites.value = await jobsDB.favoriteJobs.toArray()
       initialized.value = true
     } catch (e) {
-      console.warn('宀椾綅鏁版嵁鍒濆鍖栧け璐?', e)
+      console.warn('岗位数据初始化失败', e)
+      logAction('jobs.initJobData', { status: 'failed', error: e })
       allJobs.value = allPositions
       initialized.value = true
     } finally {
@@ -61,25 +63,34 @@ export const useJobsStore = defineStore('jobs', () => {
   }
 
   async function toggleFavorite(job) {
-    const existing = favorites.value.find(f => f.jobId === (job.id || job.title))
-    if (existing) {
-      await jobsDB.favoriteJobs.delete(existing.id)
-      favorites.value = favorites.value.filter(f => f.id !== existing.id)
-      return false
+    const key = job.id || job.title
+    logAction('jobs.toggleFavorite', { status: 'started', payload: { key, title: job.title } })
+    try {
+      const existing = favorites.value.find(f => f.jobId === key)
+      if (existing) {
+        await jobsDB.favoriteJobs.delete(existing.id)
+        favorites.value = favorites.value.filter(f => f.id !== existing.id)
+        logAction('jobs.toggleFavorite', { status: 'success', payload: { key, title: job.title, added: false } })
+        return false
+      }
+      const id = await jobsDB.favoriteJobs.add({
+        jobId: key,
+        title: job.title,
+        category: job.category,
+        subCategory: job.subCategory,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        matchScore: job.matchScore,
+        createdAt: new Date().toISOString()
+      })
+      const newFav = { id, jobId: key, title: job.title, category: job.category, subCategory: job.subCategory, salaryMin: job.salaryMin, salaryMax: job.salaryMax, matchScore: job.matchScore, createdAt: new Date().toISOString() }
+      favorites.value = [...favorites.value, newFav]
+      logAction('jobs.toggleFavorite', { status: 'success', payload: { key, title: job.title, added: true } })
+      return true
+    } catch (e) {
+      logAction('jobs.toggleFavorite', { status: 'failed', payload: { key, title: job.title }, error: e })
+      throw e
     }
-    const id = await jobsDB.favoriteJobs.add({
-      jobId: job.id || job.title,
-      title: job.title,
-      category: job.category,
-      subCategory: job.subCategory,
-      salaryMin: job.salaryMin,
-      salaryMax: job.salaryMax,
-      matchScore: job.matchScore,
-      createdAt: new Date().toISOString()
-    })
-    const newFav = { id, jobId: job.id || job.title, title: job.title, category: job.category, subCategory: job.subCategory, salaryMin: job.salaryMin, salaryMax: job.salaryMax, matchScore: job.matchScore, createdAt: new Date().toISOString() }
-    favorites.value = [...favorites.value, newFav]
-    return true
   }
 
   function isFavorite(job) {

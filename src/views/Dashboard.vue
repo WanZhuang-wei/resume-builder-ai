@@ -85,13 +85,14 @@ import { useRouter } from 'vue-router'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import JobRecommendWidget from '@/components/JobRecommendWidget.vue'
 import { useJobsStore } from '@/stores/jobs'
+import { logAction } from '@/utils/actionLog'
 import MetricsDashboard from '@/components/MetricsDashboard.vue'
 
 const profileStore = useProfileStore()
 const router = useRouter()
 const jobsStore = useJobsStore()
 
-const hasApiKey = !!getApiKey()
+const hasApiKey = ref(!!getApiKey())
 const showApiDialog = ref(false)
 const pendingPath = ref('')
 
@@ -113,6 +114,7 @@ function checkApiThen(path) {
 }
 
 function onApiKeySaved() {
+  hasApiKey.value = !!getApiKey()
   if (pendingPath.value) {
     const path = pendingPath.value
     pendingPath.value = ''
@@ -123,9 +125,11 @@ function onApiKeySaved() {
 
 async function showConsolidateResult() {
   showToast({ message: '正在分析整理...', duration: 0 })
+  logAction('dashboard.consolidate', { status: 'started' })
   try {
     const result = await profileStore.consolidateWithKnowledge()
     closeToast()
+    logAction('dashboard.consolidate', { status: 'success', payload: { hasChanges: result.hasChanges } })
     if (!result.hasChanges) {
       const msg = result.summary.length > 0 ? result.summary.join('\n') : '未发现重复资料'
       showToast(msg)
@@ -152,6 +156,7 @@ async function showConsolidateResult() {
   } catch (e) {
     closeToast()
     showToast('整理失败: ' + e.message)
+    logAction('dashboard.consolidate', { status: 'failed', error: e })
   }
 }
 
