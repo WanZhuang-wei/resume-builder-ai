@@ -36,7 +36,7 @@
 <script setup>
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { showToast } from 'vant'
-import { chat, hrQuestion, buildHrSystemPrompt, getApiKey } from '@/api/deepseek'
+import { buildHrSystemPrompt } from '@/api/deepseek'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { logAction } from '@/utils/actionLog'
 
@@ -72,10 +72,6 @@ function getStoredCount() {
   return parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10)
 }
 
-function incrementCount() {
-  questionCount.value++
-  localStorage.setItem(STORAGE_KEY, String(questionCount.value))
-}
 
 async function loadServerStatus() {
   if (!props.shareId) return
@@ -92,35 +88,6 @@ async function loadServerStatus() {
   }
 }
 
-async function reserveQuestion(text) {
-  if (!props.shareId) {
-    incrementCount()
-    return true
-  }
-  try {
-    const res = await fetch(`${SHARE_API}/api/share/${props.shareId}/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hrKey: getFingerprint(), question: text })
-    })
-    if (res.status === 429) {
-      const data = await res.json().catch(() => ({}))
-      showToast(data.error || '提问次数已用完，请联系候选人刷新次数')
-      logAction('hrChat.reserveQuestion', { status: 'failed', payload: { reason: 'limit_reached' } })
-      return false
-    }
-    if (!res.ok) throw new Error('server ' + res.status)
-    const data = await res.json()
-    questionCount.value = (data.max || maxQuestions.value) - (data.remaining || 0)
-    maxQuestions.value = data.max || maxQuestions.value
-    localStorage.setItem(STORAGE_KEY, String(questionCount.value))
-    return true
-  } catch (e) {
-    logAction('hrChat.reserveQuestion', { status: 'failed', error: e, payload: { fallback: true } })
-    incrementCount()
-    return true
-  }
-}
 
 async function scrollToBottom() {
   await nextTick()
@@ -154,16 +121,13 @@ async function sendMessage() {
     return
   }
 
-  if (!getApiKey() && !props.apiKey) {
-    showToast('API 配置异常，请联系候选人')
-    logAction('hrChat.send', { status: 'failed', payload: { reason: 'no_api_key' } })
+  if (!props.shareId) {
+    showToast('分享链接异常，无法提问')
     return
   }
 
   inputText.value = ''
   logAction('hrChat.send', { status: 'started', payload: { textLength: text.length } })
-  const reserved = await reserveQuestion(text)
-  if (!reserved) return
   messages.value.push({ role: 'user', content: text })
   await scrollToBottom()
 
@@ -176,9 +140,28 @@ async function sendMessage() {
       { role: 'system', content: buildPromptWithKnowledge(props.context) },
       ...messages.value.map(m => ({ role: m.role, content: m.content }))
     ]
-    const response = await chat(chatMessages, { maxTokens: 500 })
-    messages.value.push({ role: 'assistant', content: response })
-    logAction('hrChat.send', { status: 'success', payload: { responseLength: response.length } })
+    // HR 提问统一走服务器代理（DeepSeek Key 只存服务器，HR 无需配置）
+    const res = await fetch(`${SHARE_API}/api/share/${props.shareId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hrKey: getFingerprint(), messages: chatMessages })
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 429) {
+      messages.value.pop()
+      showToast(data.error || '提问次数已用完，请联系候选人刷新次数')
+      if (data.max) maxQuestions.value = data.max
+      questionCount.value = maxQuestions.value
+      return
+    }
+    if (!res.ok) throw new Error(data.error || ('服务器错误 ' + res.status))
+    messages.value.push({ role: 'assistant', content: data.reply })
+    if (typeof data.remaining === 'number') {
+      maxQuestions.value = data.max || maxQuestions.value
+      questionCount.value = maxQuestions.value - data.remaining
+      localStorage.setItem(STORAGE_KEY, String(questionCount.value))
+    }
+    logAction('hrChat.send', { status: 'success', payload: { responseLength: (data.reply || '').length } })
   } catch (e) {
     messages.value.push({ role: 'assistant', content: '抱歉，回答时遇到问题：' + e.message })
     logAction('hrChat.send', { status: 'failed', error: e })
