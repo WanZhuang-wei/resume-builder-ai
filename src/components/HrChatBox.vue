@@ -2,14 +2,15 @@
   <div class="hr-chat-box">
     <div class="chat-header">
       <van-icon name="chat-o" />
-      <span>想了解我的更多项目细节？问问智能助手</span>
+      <span>想了解我更多？来问 AI 助手</span>
     </div>
 
     <div class="messages" ref="messagesRef">
       <div v-if="messages.length === 0" class="welcome-msg">
-        <p>你好！我是候选人的智能助手</p>
-        <p class="hint">你可以问我关于项目细节、工作经历等方面的问题</p>
-        <p class="hint">剩余提问次数：{{ maxQuestions - questionCount }}/{{ maxQuestions }}</p>
+        <p class="welcome-title">你好！我是{{ props.context?.basicInfo?.name || 'TA' }}的 AI 助手 👋</p>
+        <p class="hint">项目经历、工作内容、技能特长……都可以问我</p>
+        <p class="example">💬 例如：「可以介绍一下你的项目经历吗？」</p>
+        <p class="count">剩余提问次数：{{ maxQuestions - questionCount }}/{{ maxQuestions }}</p>
       </div>
       <div v-for="(msg, i) in messages" :key="i" :class="['msg-item', msg.role]">
         <div class="msg-content">{{ msg.content }}</div>
@@ -27,8 +28,22 @@
     </div>
 
     <div v-else class="chat-input">
-      <van-field v-model="inputText" :disabled="loading" placeholder="输入你的问题..." @keypress.enter="sendMessage" :border="false" />
-      <van-button :loading="loading" icon="send-o" round size="small" type="primary" :disabled="questionCount >= maxQuestions" @click="sendMessage" />
+      <van-field
+        v-model="inputText"
+        :disabled="loading"
+        placeholder="输入你想了解的问题，例如：介绍一下你的项目经历"
+        @keypress.enter="sendMessage"
+        :border="false"
+        clearable
+      />
+      <van-button
+        class="send-btn"
+        :loading="loading"
+        icon="send-o"
+        type="primary"
+        :disabled="questionCount >= maxQuestions"
+        @click="sendMessage"
+      />
     </div>
   </div>
 </template>
@@ -180,10 +195,12 @@ onMounted(() => {
 <style scoped>
 .hr-chat-box {
   background: #fff;
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
-  max-height: 450px;
+  max-height: 460px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .chat-header {
@@ -191,30 +208,58 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 14px 16px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: #1989fa;
-  border-bottom: 1px solid #f0f0f0;
+  color: #fff;
+  background: linear-gradient(135deg, #1989fa, #4bb3ff);
+}
+
+.chat-header .van-icon {
+  font-size: 18px;
 }
 
 .messages {
   flex: 1;
   overflow-y: auto;
   padding: 12px 16px;
-  min-height: 120px;
-  max-height: 280px;
+  min-height: 140px;
+  max-height: 300px;
 }
 
 .welcome-msg {
   text-align: center;
-  color: #999;
-  font-size: 13px;
-  padding: 20px;
+  color: #666;
+  font-size: 14px;
+  padding: 22px 12px;
+}
+
+.welcome-msg .welcome-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
 }
 
 .welcome-msg .hint {
+  font-size: 14px;
+  margin-top: 6px;
+  color: #888;
+}
+
+.welcome-msg .example {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 7px 14px;
+  background: #ecf5ff;
+  color: #1989fa;
+  font-size: 13px;
+  border-radius: 18px;
+}
+
+.welcome-msg .count {
+  margin-top: 10px;
   font-size: 12px;
-  margin-top: 4px;
+  color: #bbb;
 }
 
 .msg-item {
@@ -230,7 +275,7 @@ onMounted(() => {
   max-width: 85%;
   padding: 8px 12px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
@@ -269,12 +314,38 @@ onMounted(() => {
 .chat-input {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 10px 12px;
   border-top: 1px solid #f0f0f0;
+  background: #fff;
 }
 
 .chat-input .van-field {
   flex: 1;
+  background: #f7f8fa;
+  border-radius: 22px;
+  padding: 4px 8px;
+}
+
+.chat-input :deep(.van-field__control) {
+  font-size: 15px;
+  min-height: 26px;
+}
+
+.chat-input :deep(.van-field__control::placeholder) {
+  font-size: 14px;
+  color: #999;
+}
+
+.send-btn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.send-btn :deep(.van-icon) {
+  font-size: 20px;
 }
 </style>
