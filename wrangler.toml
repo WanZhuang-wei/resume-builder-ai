@@ -1,0 +1,9 @@
+# Cloudflare Pages configuration
+name = "resume-builder-ai"
+compatibility_date = "2026-08-15"
+pages_build_output_dir = "dist"
+
+# KV namespace binding (will be created during deployment)
+[[kv_namespaces]]
+binding = "SHARES_KV"
+id = "1acfb26f22bf44dd82d66870455b7285"

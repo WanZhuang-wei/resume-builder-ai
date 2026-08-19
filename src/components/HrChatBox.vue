@@ -47,7 +47,7 @@ const props = defineProps({
 })
 
 const knowledgeStore = useKnowledgeStore()
-const SHARE_API = import.meta.env.VITE_SHARE_API || 'http://localhost:3001'
+const SHARE_API = import.meta.env.VITE_SHARE_API || window.location.origin
 
 const messages = ref([])
 const inputText = ref('')

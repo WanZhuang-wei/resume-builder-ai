@@ -43,7 +43,7 @@ import { useRoute } from 'vue-router'
 import { showToast, showConfirmDialog, showSuccessToast, showFailToast } from 'vant'
 import { logAction } from '@/utils/actionLog'
 
-const SHARE_API = import.meta.env.VITE_SHARE_API || 'http://localhost:3001'
+const SHARE_API = import.meta.env.VITE_SHARE_API || window.location.origin
 const route = useRoute()
 
 const shareId = ref(route.params.id || '')
