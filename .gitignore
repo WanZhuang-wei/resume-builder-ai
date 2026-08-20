@@ -21,3 +21,7 @@ __pycache__/
 .edgeone/*
 .tef_dist/*
   
+# admin subproject
+admin/node_modules/
+admin/dist/
+

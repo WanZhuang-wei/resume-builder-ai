@@ -1,5 +1,6 @@
 import { metrics } from '@/utils/metrics'
 import { logAction } from '@/utils/actionLog'
+import { getDeviceId } from '@/utils/tracker'
 
 const API_BASE = 'https://api.deepseek.com/v1'
 const MAX_RETRIES = 3
@@ -75,7 +76,7 @@ async function parseSseResponse(response, onStream) {
   return fullContent
 }
 
-async function chatViaServerProxy(messages, { maxTokens, temperature, onStream }) {
+async function chatViaServerProxy(messages, { maxTokens, temperature, onStream, feature }) {
   let response
   try {
     response = await fetch(aiProxyUrl(), {
@@ -86,7 +87,9 @@ async function chatViaServerProxy(messages, { maxTokens, temperature, onStream }
         messages,
         maxTokens,
         temperature,
-        stream: !!onStream
+        stream: !!onStream,
+        deviceId: getDeviceId(),
+        feature
       })
     })
   } catch (err) {
@@ -115,7 +118,7 @@ export async function chat(messages, options = {}) {
   // 生产环境优先走服务器端代理（key 在服务器，浏览器无需配置）
   if (isServerAiEnabled()) {
     try {
-      const content = await chatViaServerProxy(messages, { maxTokens, temperature, onStream })
+      const content = await chatViaServerProxy(messages, { maxTokens, temperature, onStream, feature: options.feature })
       const duration = performance.now() - startTime
       logAction('api.chat', { status: 'success', durationMs: duration, payload: { via: 'server-proxy', model: 'deepseek-chat', maxTokens, messageCount: messages.length } })
       metrics.recordApiCall({ duration, success: true, retries: 0 })

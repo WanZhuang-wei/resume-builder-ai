@@ -1,8 +1,12 @@
-﻿import { defineStore } from "pinia";
+import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { computeFingerprint } from "@/utils/fingerprint";
+import { getDeviceId } from "@/utils/tracker";
+import { useMySharesStore } from "@/stores/myShares";
 
-// 本地开发时用 .env 的 VITE_SHARE_API，部署后与前端同源
+// ?????? .env ? VITE_SHARE_API?????????
 const SHARE_API = import.meta.env.VITE_SHARE_API || window.location.origin;
+const DEFAULT_TTL_MS = 40 * 24 * 60 * 60 * 1000;
 
 export const useShareStore = defineStore("share", () => {
   const selectedContact = ref({
@@ -63,66 +67,103 @@ export const useShareStore = defineStore("share", () => {
     return shareLink.value ? shareLink.value.length : 0
   });
 
-  async function generateShareLink(profileData) {
+  function buildShareData(profileData) {
+    const shareData = { contact: {}, profile: {} };
+
+    if (selectedContact.value.showPhone && profileData.basicInfo?.phone) {
+      shareData.contact.phone = profileData.basicInfo.phone;
+    }
+    if (selectedContact.value.showWechat && profileData.basicInfo?.wechat) {
+      shareData.contact.wechat = profileData.basicInfo.wechat;
+    }
+    if (selectedContact.value.showEmail && profileData.basicInfo?.email) {
+      shareData.contact.email = profileData.basicInfo.email;
+    }
+
+    if (selectedSections.value.basicInfo && profileData.basicInfo) {
+      shareData.profile.basicInfo = {
+        name: profileData.basicInfo.name,
+        title: profileData.basicInfo.title,
+        summary: profileData.basicInfo.summary,
+        targetPosition: profileData.basicInfo.targetPosition,
+      };
+    }
+    if (selectedSections.value.workExperiences) {
+      shareData.profile.workExperiences = profileData.workExperiences || [];
+    }
+    if (selectedSections.value.education) {
+      shareData.profile.education = profileData.education || [];
+    }
+    if (selectedSections.value.projects) {
+      shareData.profile.projects = profileData.projects || [];
+    }
+    if (selectedSections.value.skills) {
+      shareData.profile.skills = profileData.skills || [];
+    }
+    if (selectedSections.value.certificates) {
+      shareData.profile.certificates = profileData.certificates || [];
+    }
+    return shareData;
+  }
+
+  async function generateShareLink(profileData, { forceNew = false } = {}) {
     generating.value = true;
     try {
-      const shareData = { contact: {}, profile: {} };
+      const shareData = buildShareData(profileData);
+      const fingerprint = await computeFingerprint(shareData);
 
-      if (selectedContact.value.showPhone && profileData.basicInfo?.phone) {
-        shareData.contact.phone = profileData.basicInfo.phone;
-      }
-      if (selectedContact.value.showWechat && profileData.basicInfo?.wechat) {
-        shareData.contact.wechat = profileData.basicInfo.wechat;
-      }
-      if (selectedContact.value.showEmail && profileData.basicInfo?.email) {
-        shareData.contact.email = profileData.basicInfo.email;
-      }
-
-      if (selectedSections.value.basicInfo && profileData.basicInfo) {
-        shareData.profile.basicInfo = {
-          name: profileData.basicInfo.name,
-          title: profileData.basicInfo.title,
-          summary: profileData.basicInfo.summary,
-          targetPosition: profileData.basicInfo.targetPosition,
-        };
-      }
-      if (selectedSections.value.workExperiences) {
-        shareData.profile.workExperiences = profileData.workExperiences || [];
-      }
-      if (selectedSections.value.education) {
-        shareData.profile.education = profileData.education || [];
-      }
-      if (selectedSections.value.projects) {
-        shareData.profile.projects = profileData.projects || [];
-      }
-      if (selectedSections.value.skills) {
-        shareData.profile.skills = profileData.skills || [];
-      }
-      if (selectedSections.value.certificates) {
-        shareData.profile.certificates = profileData.certificates || [];
-      }
-
-      // POST 到分享服务器，拿短 ID
+      // POST ????????? ID????????????
       const res = await fetch(SHARE_API + '/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(shareData)
+        body: JSON.stringify({
+          profile: shareData.profile,
+          contact: shareData.contact,
+          fingerprint,
+          forceNew,
+          deviceId: getDeviceId(),
+        })
       });
-      if (!res.ok) throw new Error('服务器错误 ' + res.status);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || ('????? ' + res.status));
+      }
       const result = await res.json();
 
       const baseUrl = window.location.origin + window.location.pathname;
-      shareLink.value = baseUrl + '#/hr/' + result.id;
+      const link = baseUrl + '#/hr/' + result.id;
+      shareLink.value = link;
       manageToken.value = result.manageToken || "";
       lastShareId.value = result.id;
-      return shareLink.value;
+
+      // ????????????IndexedDB?
+      try {
+        const myShares = useMySharesStore();
+        await myShares.upsert({
+          shareId: result.id,
+          manageToken: result.manageToken || "",
+          createdAt: Date.now(),
+          expiresAt: Date.now() + DEFAULT_TTL_MS,
+          link,
+          fingerprint,
+          status: "active",
+        });
+      } catch (e) {
+        console.warn('[share] save to myShares failed', e)
+      }
+
+      return {
+        link,
+        id: result.id,
+        manageToken: result.manageToken || "",
+        reused: !!result.reused,
+      };
     } finally {
       generating.value = false;
     }
   }
 
   function getUrlWarning() {
-    // 短 ID 方案下链接极短，不再需要 warning
     return "";
   }
 

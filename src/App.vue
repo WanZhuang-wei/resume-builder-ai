@@ -19,6 +19,7 @@
           <van-tabbar-item icon="description" to="/resume">简历</van-tabbar-item>
           <van-tabbar-item icon="chat-o" to="/chat">问答</van-tabbar-item>
           <van-tabbar-item icon="file-o" to="/import">导入</van-tabbar-item>
+          <van-tabbar-item icon="apps-o" to="/shares">我的分享</van-tabbar-item>
         </van-tabbar>
       </div>
     </template>
@@ -33,6 +34,7 @@ import { useProfileStore } from '@/stores/profile'
 import { metrics } from '@/utils/metrics'
 import { showToast, showDialog } from 'vant'
 import { logAction } from '@/utils/actionLog'
+import { setEnabled as enableTracker, installAutoFlush, track } from '@/utils/tracker'
 import { backupNow, hasBackup, restoreFromBackup } from '@/utils/dataGuard'
 
 const route = useRoute()
@@ -49,6 +51,9 @@ function goSettings() {
 
 onMounted(async () => {
   await router.isReady()
+  enableTracker(import.meta.env.PROD)
+  installAutoFlush()
+  track('app_open')
   metrics.loadPersisted()
   try {
     await profileStore.loadAll()

@@ -66,6 +66,14 @@
       </van-cell-group>
     </div>
 
+    <div class="section-card">
+      <div class="section-title">数据统计与隐私</div>
+      <div style="font-size:13px;color:#666;line-height:1.7">
+        本应用仅统计匿名使用情况（如功能使用次数、AI 用量），用于改进产品；<br />
+        不收集简历内容、姓名与联系方式，事件数据保留 90 天后自动清理。
+      </div>
+    </div>
+
     <MetricsDashboard full />
   </div>
 </template>

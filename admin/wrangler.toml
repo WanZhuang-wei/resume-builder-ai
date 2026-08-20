@@ -1,15 +1,17 @@
-# Cloudflare Pages configuration
-name = "resume-builder-ai"
+name = "resume-admin"
 compatibility_date = "2026-08-15"
 pages_build_output_dir = "dist"
 
-# KV namespace binding (share payload)
+# 分享 payload KV（删除/延期时同步）
 [[kv_namespaces]]
 binding = "SHARES_KV"
 id = "1acfb26f22bf44dd82d66870455b7285"
 
-# D1 database binding (share metadata + analytics events)
+# 指标与分享元数据 D1
 [[d1_databases]]
 binding = "ANALYTICS_DB"
 database_name = "resume-metrics"
 database_id = "cca23504-3dff-456d-9407-cc4816a88f88"
+
+[vars]
+ADMIN_EMAIL = "3519543133@qq.com"

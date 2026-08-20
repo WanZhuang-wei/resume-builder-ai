@@ -86,6 +86,7 @@ import HrInfoCard from '@/components/HrInfoCard.vue'
 import HrChatBox from '@/components/HrChatBox.vue'
 import { useShareStore } from '@/stores/share'
 import { logAction } from '@/utils/actionLog'
+import { getDeviceId } from '@/utils/tracker'
 
 // 本地开发时用 .env 的 VITE_SHARE_API，部署后与前端同源
 const SHARE_API = import.meta.env.VITE_SHARE_API || window.location.origin
@@ -108,7 +109,7 @@ onMounted(async () => {
   // Step 1: 尝试从分享服务器获取（新短链接）
   let loaded = false
   try {
-    const res = await fetch(SHARE_API + '/api/share/' + param)
+    const res = await fetch(SHARE_API + '/api/share/' + param + '?deviceId=' + encodeURIComponent(getDeviceId()))
     if (res.ok) {
       const decoded = await res.json()
       if (decoded && decoded.profile) {

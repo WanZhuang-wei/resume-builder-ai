@@ -140,6 +140,7 @@ import { useKnowledgeStore } from '@/stores/knowledge'
 import { useProfileStore } from '@/stores/profile'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import { logAction } from '@/utils/actionLog'
+import { track } from '@/utils/tracker'
 
 const knowledgeStore = useKnowledgeStore()
 const profileStore = useProfileStore()
@@ -252,6 +253,7 @@ async function applyToProfile() {
   if (!profileStore.loaded) await profileStore.loadAll()
   applying.value = true
   let successCount = 0, failCount = 0
+  track('feature_use', { feature: 'auto_fill' })
   const data = extractedData.value
   try {
     try {

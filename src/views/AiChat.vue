@@ -63,6 +63,7 @@ import { useJobsStore } from '@/stores/jobs'
 import { useResumeStore } from '@/stores/resume'
 import db from '@/db/index'
 import { logAction } from '@/utils/actionLog'
+import { track } from '@/utils/tracker'
 
 const profileStore = useProfileStore()
 const jobsStore = useJobsStore()
@@ -182,6 +183,7 @@ async function sendMessage() {
       ...messages.value.slice(-10).map(m => ({ role: m.role, content: m.content }))
     ]
     const response = await chat(chatMessages, { maxTokens: 1500 })
+    track('feature_use', { feature: 'qa' })
 
     const assistantId = await saveMessage('assistant', response)
     messages.value.push({ id: assistantId, role: 'assistant', content: response })
@@ -309,6 +311,7 @@ async function executeResumeGeneration(target, company, jd) {
   try {
     const context = profileStore.summaryData
     const resumeContent = await generateResume(context, company, target, jd || undefined)
+    track('feature_use', { feature: 'resume_generate' })
 
     const markdownContent = '## 简历生成结果\n\n' + resumeContent + '\n\n---\n*你可以点击下方按钮保存此简历*'
 

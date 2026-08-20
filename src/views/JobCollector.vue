@@ -51,6 +51,7 @@ import { useRouter } from "vue-router"
 import db from "@/db"
 import { extractJobInfo, hasAiAccess } from "@/api/deepseek"
 import { logAction } from "@/utils/actionLog"
+import { track } from '@/utils/tracker'
 
 const router = useRouter()
 const form = ref({ company: "", position: "", salary: "", city: "", jd: "" })
@@ -91,6 +92,7 @@ async function saveJob() {
 }
 
 async function parseWithAI() {
+  track('feature_use', { feature: 'job_collect' })
   if (!form.value.jd.trim()) { showToast("请先粘贴JD文本"); return }
   parsing.value = true
   try {

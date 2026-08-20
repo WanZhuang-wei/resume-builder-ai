@@ -27,6 +27,7 @@ import { useProfileStore } from '@/stores/profile'
 import { analyzeJob, hasAiAccess } from '@/api/deepseek'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import { logAction } from '@/utils/actionLog'
+import { track } from '@/utils/tracker'
 
 const profileStore = useProfileStore()
 const route = useRoute()
@@ -53,6 +54,7 @@ async function startAnalyze() {
   loading.value = true
   try {
     if (!profileStore.loaded) await profileStore.loadAll()
+    track('feature_use', { feature: 'job_analyze' })
     const res = await analyzeJob(profileStore.summaryData, jobDescription.value)
     result.value = res
     logAction('jobAnalyzer.analyze', { status: 'success', payload: { jdLength: jobDescription.value.length } })

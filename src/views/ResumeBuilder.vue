@@ -83,6 +83,7 @@ import ResumeTemplate from '@/components/ResumeTemplate.vue'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import { exportDocx } from '@/utils/exportDocx'
 import { logAction } from '@/utils/actionLog'
+import { track } from '@/utils/tracker'
 import * as mammoth from 'mammoth'
 
 const resumeStore = useResumeStore()
@@ -124,6 +125,7 @@ async function startGenerate() {
   await doGenerate()
 }
 
+  track('feature_use', { feature: 'resume_generate' })
 async function doGenerate() {
   if (!profileStore.loaded) await profileStore.loadAll()
   try {
