@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="ai-chat">
     <ApiKeyDialog v-model="showApiDialog" @saved="onApiKeySaved" />
 
@@ -56,7 +56,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { showToast } from 'vant'
 import { useProfileStore } from '@/stores/profile'
-import { chat, buildChatSystemPrompt, getApiKey, generateResume } from '@/api/deepseek'
+import { chat, buildChatSystemPrompt, hasAiAccess, generateResume } from '@/api/deepseek'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import { buildJobsSystemPrompt } from '@/utils/jobMatcher'
 import { useJobsStore } from '@/stores/jobs'
@@ -155,7 +155,7 @@ async function sendMessage() {
     }
   }
 
-  if (!getApiKey()) {
+  if (!hasAiAccess()) {
     pendingMessage.value = text
     inputText.value = ''
     showApiDialog.value = true
@@ -297,7 +297,7 @@ async function handleResumeGenerate() {
 }
 
 async function executeResumeGeneration(target, company, jd) {
-  if (!getApiKey()) {
+  if (!hasAiAccess()) {
     pendingResumeGeneration.value = { target, company, jd }
     showApiDialog.value = true
     return

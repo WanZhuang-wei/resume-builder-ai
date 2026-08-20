@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="dashboard">
     <ApiKeyDialog v-model="showApiDialog" @saved="onApiKeySaved" />
 
@@ -80,7 +80,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { showToast, showDialog, closeToast } from 'vant'
 import { useProfileStore } from '@/stores/profile'
-import { getApiKey } from '@/api/deepseek'
+import { hasAiAccess } from '@/api/deepseek'
 import { useRouter } from 'vue-router'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import JobRecommendWidget from '@/components/JobRecommendWidget.vue'
@@ -92,7 +92,7 @@ const profileStore = useProfileStore()
 const router = useRouter()
 const jobsStore = useJobsStore()
 
-const hasApiKey = ref(!!getApiKey())
+const hasApiKey = ref(hasAiAccess())
 const showApiDialog = ref(false)
 const pendingPath = ref('')
 
@@ -105,7 +105,7 @@ const internshipCount = computed(() =>
 )
 
 function checkApiThen(path) {
-  if (!getApiKey()) {
+  if (!hasAiAccess()) {
     pendingPath.value = path
     showApiDialog.value = true
   } else {
@@ -114,7 +114,7 @@ function checkApiThen(path) {
 }
 
 function onApiKeySaved() {
-  hasApiKey.value = !!getApiKey()
+  hasApiKey.value = hasAiAccess()
   if (pendingPath.value) {
     const path = pendingPath.value
     pendingPath.value = ''
