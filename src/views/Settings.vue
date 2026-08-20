@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="settings">
     <div class="section-card api-section">
       <div class="section-title">
@@ -6,7 +6,7 @@
         DeepSeek API 配置
       </div>
       <div class="api-intro">
-        <p>AI 简历生成、自动填写、智能问答等功能均需通过 DeepSeek API 调用。</p>
+        <p>线上版本 AI 密钥已由服务器统一配置，无需填写；仅本地开发时需要填写本地 Key。</p>
       </div>
       <van-form @submit="saveKey">
         <van-field
@@ -22,7 +22,7 @@
           </template>
         </van-field>
         <div style="font-size:12px;color:#999;padding:0 16px 8px">
-          Key 仅存储在浏览器本地，不会上传至任何服务器
+          本地 Key 仅用于本地开发，只存储在浏览器本地，不会上传至任何服务器
         </div>
         <div class="api-actions">
           <van-button round block type="primary" native-type="submit" size="small" :loading="saving">

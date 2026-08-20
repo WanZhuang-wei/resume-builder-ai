@@ -1,4 +1,4 @@
-﻿import { metrics } from '@/utils/metrics'
+import { metrics } from '@/utils/metrics'
 import { logAction } from '@/utils/actionLog'
 
 const API_BASE = 'https://api.deepseek.com/v1'
@@ -35,18 +35,110 @@ export function getApiKey() {
   return localStorage.getItem('deepseek_api_key') || ''
 }
 
+export function isServerAiEnabled() {
+  // 生产环境（部署到 Cloudflare/EdgeOne）使用服务器端密钥代理；本地开发回退到浏览器本地 Key
+  return !import.meta.env.DEV && typeof window !== 'undefined'
+}
+
+export function hasAiAccess() {
+  return !!(getApiKey() || isServerAiEnabled())
+}
+
+class ProxyNotAvailable extends Error {}
+
+function aiProxyUrl() {
+  return window.location.origin + '/api/ai/chat'
+}
+
+async function parseSseResponse(response, onStream) {
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let fullContent = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const chunk = decoder.decode(value, { stream: true })
+    const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
+    for (const line of lines) {
+      const data = line.slice(6).trim()
+      if (data === '[DONE]') continue
+      try {
+        const parsed = JSON.parse(data)
+        const content = parsed.choices?.[0]?.delta?.content || ''
+        fullContent += content
+        onStream(fullContent)
+      } catch {
+        // skip parse errors
+      }
+    }
+  }
+  return fullContent
+}
+
+async function chatViaServerProxy(messages, { maxTokens, temperature, onStream }) {
+  let response
+  try {
+    response = await fetch(aiProxyUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages,
+        maxTokens,
+        temperature,
+        stream: !!onStream
+      })
+    })
+  } catch (err) {
+    // 服务器代理不可达（例如本地开发时没有该接口），回退本地 Key
+    throw new ProxyNotAvailable(err && err.message)
+  }
+  if (response.status === 404 || response.status === 405 || response.status === 501) {
+    throw new ProxyNotAvailable('proxy not deployed')
+  }
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error || '服务器 AI 接口错误（HTTP ' + response.status + '）')
+  }
+  if (onStream) {
+    return parseSseResponse(response, onStream)
+  }
+  const data = await response.json()
+  if (!data.content) throw new Error('服务器 AI 返回内容为空')
+  return data.content
+}
+
 export async function chat(messages, options = {}) {
+  const { maxTokens = 2000, temperature = 0.7, onStream } = options
+  const startTime = performance.now()
+
+  // 生产环境优先走服务器端代理（key 在服务器，浏览器无需配置）
+  if (isServerAiEnabled()) {
+    try {
+      const content = await chatViaServerProxy(messages, { maxTokens, temperature, onStream })
+      const duration = performance.now() - startTime
+      logAction('api.chat', { status: 'success', durationMs: duration, payload: { via: 'server-proxy', model: 'deepseek-chat', maxTokens, messageCount: messages.length } })
+      metrics.recordApiCall({ duration, success: true, retries: 0 })
+      return content
+    } catch (err) {
+      const duration = performance.now() - startTime
+      if (err instanceof ProxyNotAvailable) {
+        // 服务器代理未部署，回退到本地 Key
+      } else {
+        logAction('api.chat', { status: 'failed', durationMs: duration, payload: { via: 'server-proxy', messageCount: messages.length }, error: err })
+        metrics.recordApiCall({ duration, success: false, retries: 0 })
+        throw err
+      }
+    }
+  }
+
   const apiKey = getApiKey()
   if (!apiKey) throw new Error('请先设置 DeepSeek API Key')
-
-  const { maxTokens = 2000, temperature = 0.7, onStream } = options
 
   if (onStream) {
     return streamChat(messages, apiKey, { maxTokens, temperature, onStream })
   }
 
-  const startTime = performance.now()
-  logAction('api.chat', { status: 'started', payload: { model: 'deepseek-chat', maxTokens, messageCount: messages.length } })
   try {
     const result = await fetchWithRetry(API_BASE + '/chat/completions', {
       method: 'POST',
@@ -62,12 +154,12 @@ export async function chat(messages, options = {}) {
       })
     })
     const duration = performance.now() - startTime
-    logAction('api.chat', { status: 'success', durationMs: duration, payload: { messageCount: messages.length, retries: result.retriesUsed } })
+    logAction('api.chat', { status: 'success', durationMs: duration, payload: { via: 'direct', messageCount: messages.length, retries: result.retriesUsed } })
     metrics.recordApiCall({ duration, success: true, retries: result.retriesUsed })
     return result.data.choices[0].message.content
   } catch (err) {
     const duration = performance.now() - startTime
-    logAction('api.chat', { status: 'failed', durationMs: duration, payload: { messageCount: messages.length, retries: err.retriesUsed || 0 }, error: err })
+    logAction('api.chat', { status: 'failed', durationMs: duration, payload: { via: 'direct', messageCount: messages.length, retries: err.retriesUsed || 0 }, error: err })
     metrics.recordApiCall({ duration, success: false, retries: err.retriesUsed || 0 })
     throw err
   }
@@ -76,7 +168,6 @@ export async function chat(messages, options = {}) {
 export async function streamChat(messages, apiKey, { maxTokens, temperature, onStream }) {
   const startTime = performance.now()
   logAction('api.stream', { status: 'started', payload: { model: 'deepseek-chat', maxTokens, messageCount: messages.length } })
-  let firstChunkTime = null
 
   try {
     const response = await fetch(API_BASE + '/chat/completions', {
@@ -99,37 +190,11 @@ export async function streamChat(messages, apiKey, { maxTokens, temperature, onS
       throw new Error(error.error?.message || 'HTTP ' + response.status)
     }
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let fullContent = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (firstChunkTime === null) {
-        firstChunkTime = performance.now() - startTime
-      }
-
-      const chunk = decoder.decode(value, { stream: true })
-      const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
-
-      for (const line of lines) {
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') continue
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content || ''
-          fullContent += content
-          onStream(fullContent)
-        } catch {
-          // skip parse errors
-        }
-      }
-    }
+    const fullContent = await parseSseResponse(response, onStream)
 
     const duration = performance.now() - startTime
-    logAction('api.stream', { status: 'success', durationMs: duration, payload: { messageCount: messages.length, firstTokenMs: firstChunkTime } })
-    metrics.recordApiCall({ duration, firstToken: firstChunkTime, success: true })
+    logAction('api.stream', { status: 'success', durationMs: duration, payload: { messageCount: messages.length, firstTokenMs: null } })
+    metrics.recordApiCall({ duration, firstToken: null, success: true })
     return fullContent
   } catch (err) {
     const duration = performance.now() - startTime

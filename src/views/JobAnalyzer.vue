@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="job-analyzer">
     <ApiKeyDialog v-model="showApiDialog" @saved="onApiKeySaved" />
 
@@ -24,7 +24,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import { useProfileStore } from '@/stores/profile'
-import { analyzeJob, getApiKey } from '@/api/deepseek'
+import { analyzeJob, hasAiAccess } from '@/api/deepseek'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
 import { logAction } from '@/utils/actionLog'
 
@@ -45,7 +45,7 @@ onMounted(() => {
 })
 
 async function startAnalyze() {
-  if (!getApiKey()) {
+  if (!hasAiAccess()) {
     pendingAction.value = true
     showApiDialog.value = true
     return

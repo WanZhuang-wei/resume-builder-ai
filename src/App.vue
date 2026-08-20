@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="app-container">
     <router-view v-if="isHrView" />
     <template v-else>
@@ -58,7 +58,13 @@ onMounted(async () => {
     showToast({ message: '\u672c\u5730\u6570\u636e\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5230\u8bbe\u7f6e\u9875\u6062\u590d\u5907\u4efd', type: 'fail' })
   }
 
-  const empty = !profileStore.basicInfo && profileStore.workExperiences.length === 0 && profileStore.projects.length === 0
+  const empty = !profileStore.basicInfo &&
+    profileStore.workExperiences.length === 0 &&
+    profileStore.education.length === 0 &&
+    profileStore.projects.length === 0 &&
+    profileStore.skills.length === 0 &&
+    profileStore.certificates.length === 0
+
   if (empty && hasBackup()) {
     showDialog({
       title: '\u68c0\u6d4b\u5230\u672c\u5730\u6570\u636e\u4e3a\u7a7a',
@@ -68,16 +74,19 @@ onMounted(async () => {
     }).then(async () => {
       await restoreFromBackup()
       await profileStore.loadAll()
+      // \u6062\u590d\u6210\u529f\u540e\u628a\u5df2\u6062\u590d\u7684\u6570\u636e\u91cd\u65b0\u5199\u56de\u5907\u4efd\uff0c\u907f\u514d\u4e0b\u6b21\u88ab\u7a7a\u6570\u636e\u8986\u76d6
+      try { await backupNow(); logAction('app.startup.backup', { status: 'success', payload: { afterRestore: true } }) } catch (e) { logAction('app.startup.backup', { status: 'failed', error: e }) }
       showToast('\u5df2\u4ece\u5907\u4efd\u6062\u590d')
       logAction('app.startup.restoreBackup', { status: 'success' })
     }).catch(() => {})
-  }
-
-  try {
-    await backupNow()
-    logAction('app.startup.backup', { status: 'success', payload: { hasBackup: hasBackup() } })
-  } catch (e) {
-    logAction('app.startup.backup', { status: 'failed', error: e })
+  } else if (!empty) {
+    // \u4ec5\u5728\u6709\u6570\u636e\u65f6\u624d\u5728\u542f\u52a8\u65f6\u5237\u65b0\u5907\u4efd\uff1b\u6570\u636e\u4e3a\u7a7a\u65f6\u7edd\u4e0d\u8986\u76d6\u5df2\u6709\u5907\u4efd
+    try {
+      await backupNow()
+      logAction('app.startup.backup', { status: 'success', payload: { hasBackup: hasBackup() } })
+    } catch (e) {
+      logAction('app.startup.backup', { status: 'failed', error: e })
+    }
   }
 
   window.addEventListener('beforeunload', () => {

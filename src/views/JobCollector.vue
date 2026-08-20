@@ -49,7 +49,7 @@ import { ref, onMounted } from "vue"
 import { showToast } from "vant"
 import { useRouter } from "vue-router"
 import db from "@/db"
-import { extractJobInfo, getApiKey } from "@/api/deepseek"
+import { extractJobInfo, hasAiAccess } from "@/api/deepseek"
 import { logAction } from "@/utils/actionLog"
 
 const router = useRouter()
@@ -94,7 +94,7 @@ async function parseWithAI() {
   if (!form.value.jd.trim()) { showToast("请先粘贴JD文本"); return }
   parsing.value = true
   try {
-    if (!getApiKey()) {
+    if (!hasAiAccess()) {
       showToast("请先配置 API Key")
       logAction("jobCollector.aiParse", { status: "failed", payload: { reason: "missing_api_key" } })
       return

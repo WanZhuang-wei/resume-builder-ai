@@ -1,7 +1,7 @@
-﻿/**
+/**
  * AI 文档资料提取 — 调用 DeepSeek 从文档文本中提取结构化简历数据
  */
-import { chat, getApiKey } from './deepseek'
+import { chat, hasAiAccess } from './deepseek'
 
 const EXTRACTION_PROMPT = `你是一个专业的简历信息提取助手。请从用户提供的文档文本中，提取所有与简历相关的结构化信息。
 
@@ -70,8 +70,7 @@ const EXTRACTION_PROMPT = `你是一个专业的简历信息提取助手。请�
 6. 工作经历中的 type 字段很重要，请根据职位名称和描述准确判断是实习还是全职`
 
 export async function extractResumeData(documentText, onProgress) {
-  const apiKey = getApiKey()
-  if (!apiKey) {
+  if (!hasAiAccess()) {
     throw new Error('请先在设置中配置 DeepSeek API Key')
   }
 

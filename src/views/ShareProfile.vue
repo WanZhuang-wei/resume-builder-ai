@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="share-profile">
     <div class="section-card">
       <div class="section-title">选择联系方式</div>
@@ -81,7 +81,6 @@ import { showToast } from 'vant'
 import { useProfileStore } from '@/stores/profile'
 import { useShareStore } from '@/stores/share'
 import { useRouter } from 'vue-router'
-import { getApiKey } from '@/api/deepseek'
 import { logAction } from '@/utils/actionLog'
 
 const profileStore = useProfileStore()

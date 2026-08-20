@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="resume-builder">
     <ApiKeyDialog v-model="showApiDialog" @saved="onApiKeySaved" />
 
@@ -33,7 +33,7 @@
       </div>
     </div>
 
-    <div v-if="!getApiKey()" class="section-card">
+    <div v-if="!hasAiAccess()" class="section-card">
       <div class="api-missing-hint" @click="showApiDialog = true">
         <van-icon name="info-o" style="color:#ff976a;font-size:16px" />
         <span style="font-size:13px;color:#944">未配置 API Key，点击此处设置</span>
@@ -77,7 +77,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import { showToast } from 'vant'
 import { useResumeStore } from '@/stores/resume'
 import { useProfileStore } from '@/stores/profile'
-import { getApiKey } from '@/api/deepseek'
+import { hasAiAccess } from '@/api/deepseek'
 import { exportPDF } from '@/utils/export'
 import ResumeTemplate from '@/components/ResumeTemplate.vue'
 import ApiKeyDialog from '@/components/ApiKeyDialog.vue'
@@ -104,7 +104,7 @@ onMounted(() => {
 })
 
 async function startGenerate() {
-  if (!getApiKey()) {
+  if (!hasAiAccess()) {
     pendingAction.value = true
     showApiDialog.value = true
     return

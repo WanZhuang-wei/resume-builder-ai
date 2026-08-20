@@ -133,7 +133,7 @@
 
 import { ref, computed, onMounted } from 'vue'
 import { showToast, showConfirmDialog, showSuccessToast } from 'vant'
-import { getApiKey } from '@/api/deepseek'
+import { hasAiAccess } from '@/api/deepseek'
 import { extractResumeData, hasExtractedData, sanitizeExtractedData } from '@/api/extract'
 import { parseDocument, checkFileSize } from '@/utils/parser'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -183,7 +183,7 @@ function handleFileChange(e) {
 }
 
 async function processFile(file) {
-  if (!getApiKey()) { pendingFile.value = file; showApiDialog.value = true; return }
+  if (!hasAiAccess()) { pendingFile.value = file; showApiDialog.value = true; return }
   try {
     checkFileSize(file)
     currentFileName.value = file.name
