@@ -1,4 +1,4 @@
-// GET/POST /api/share/:id/manage ? ??????????????????????
+// GET/POST /api/share/:id/manage — 分享管理：统计、重置、上限、延期、撤销、删除
 import { cors, json, nowMs, clampInt, EXTEND_MS, LEGACY_TTL_MS, DEFAULT_MAX_QUESTIONS, getShare, parseSessions, updateShare, kvPut, kvDelete, deleteShare, extendExpiry } from '../../../_shared.js'
 
 function checkToken(share, token) {
@@ -31,26 +31,26 @@ export async function onRequestOptions() { return new Response(null, { status: 2
 
 export async function onRequestGet(context) {
   const id = context.params.id
-  if (!id) return json({ error: '???? ID' }, 400)
+  if (!id) return json({ error: '缺少分享 ID' }, 400)
   const share = await getShare(context.env, id)
-  if (!share.payload && !share.meta) return json({ error: '???????' }, 404)
-  if (!checkToken(share, new URL(context.request.url).searchParams.get('token'))) return json({ error: '??????' }, 403)
+  if (!share.payload && !share.meta) return json({ error: '分享链接不存在' }, 404)
+  if (!checkToken(share, new URL(context.request.url).searchParams.get('token'))) return json({ error: '管理口令无效' }, 403)
   return json(buildResponse(share, id))
 }
 
 export async function onRequestPost(context) {
   const id = context.params.id
-  if (!id) return json({ error: '???? ID' }, 400)
+  if (!id) return json({ error: '缺少分享 ID' }, 400)
   let body
-  try { body = await context.request.json() } catch { return json({ error: '?????' }, 400) }
+  try { body = await context.request.json() } catch { return json({ error: '请求体无效' }, 400) }
   const share = await getShare(context.env, id)
-  if (!share.payload && !share.meta) return json({ error: '???????' }, 404)
-  if (!checkToken(share, body.token)) return json({ error: '??????' }, 403)
+  if (!share.payload && !share.meta) return json({ error: '分享链接不存在' }, 404)
+  if (!checkToken(share, body.token)) return json({ error: '管理口令无效' }, 403)
 
   const sessions = parseSessions(share.meta)
   let maxQuestions = share.meta ? share.meta.max_questions : (share.payload?.maxQuestions || DEFAULT_MAX_QUESTIONS)
 
-  // ??????
+  // 生命周期操作
   if (body.action === 'revoke') {
     await updateShare(context.env, id, { status: 'revoked' })
     await kvDelete(context.env, id)
@@ -68,7 +68,7 @@ export async function onRequestPost(context) {
     return json({ ok: true, expiresAt: new Date(next).toISOString() })
   }
 
-  // ??/????
+  // 次数/上限管理
   let changed = false
   if (body.resetAll === true) { sessions.splice(0); changed = true }
   else if (body.resetHrKey) {

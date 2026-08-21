@@ -4,7 +4,7 @@ import { computeFingerprint } from "@/utils/fingerprint";
 import { getDeviceId } from "@/utils/tracker";
 import { useMySharesStore } from "@/stores/myShares";
 
-// ?????? .env ? VITE_SHARE_API?????????
+// 本地开发时用 .env 的 VITE_SHARE_API，部署后与前端同源
 const SHARE_API = import.meta.env.VITE_SHARE_API || window.location.origin;
 const DEFAULT_TTL_MS = 40 * 24 * 60 * 60 * 1000;
 
@@ -112,7 +112,7 @@ export const useShareStore = defineStore("share", () => {
       const shareData = buildShareData(profileData);
       const fingerprint = await computeFingerprint(shareData);
 
-      // POST ????????? ID????????????
+      // POST 到分享服务器，拿短 ID（同指纹会复用稳定链接）
       const res = await fetch(SHARE_API + '/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,7 +126,7 @@ export const useShareStore = defineStore("share", () => {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || ('????? ' + res.status));
+        throw new Error(data.error || ('服务器错误 ' + res.status));
       }
       const result = await res.json();
 
@@ -136,7 +136,7 @@ export const useShareStore = defineStore("share", () => {
       manageToken.value = result.manageToken || "";
       lastShareId.value = result.id;
 
-      // ????????????IndexedDB?
+      // 记录到本机“我的分享”（IndexedDB）
       try {
         const myShares = useMySharesStore();
         await myShares.upsert({

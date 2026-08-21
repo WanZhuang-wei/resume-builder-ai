@@ -1,4 +1,4 @@
-// POST /api/share ? ??/??????????? + 40 ? TTL + ???????
+// POST /api/share — 创建/复用分享记录（稳定链接 + 40 天 TTL + 生命周期管理）
 import { cors, json, nowMs, clampInt, DEFAULT_TTL_MS, DEFAULT_MAX_QUESTIONS, insertShare, findShareByFingerprint, updateShare, kvPut, recordEvent } from '../../_shared.js'
 
 const CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -17,8 +17,8 @@ export async function onRequestOptions() {
 
 export async function onRequestPost(context) {
   let body
-  try { body = await context.request.json() } catch { return json({ error: '???????? JSON' }, 400) }
-  if (!body?.profile) return json({ error: '???????' }, 400)
+  try { body = await context.request.json() } catch { return json({ error: '请求体不是有效的 JSON' }, 400) }
+  if (!body?.profile) return json({ error: '无效的分享数据' }, 400)
 
   const now = nowMs()
   const deviceId = String(body.deviceId || '').slice(0, 100)
@@ -31,7 +31,7 @@ export async function onRequestPost(context) {
   }
   const origin = new URL(context.request.url).origin
 
-  // ???????? + active + ??? ? ???? id????? 40 ??
+  // 稳定链接：同指纹 + active + 未过期 → 复用同一 id（顺带续期 40 天）
   if (!forceNew && fingerprint) {
     const existing = await findShareByFingerprint(context.env, fingerprint)
     if (existing) {

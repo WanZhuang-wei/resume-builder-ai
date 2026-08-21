@@ -1,4 +1,4 @@
-// ?????D1/KV ????????????TTL?Pages Functions ???????????
+// 共享工具：D1/KV 双读写、事件上报、限流、TTL（Pages Functions 下划线文件不会被路由）
 export const EVENT_WHITELIST = new Set(['app_open', 'feature_use', 'share_create', 'share_view', 'share_ask', 'ai_request'])
 export const FEATURE_WHITELIST = new Set(['auto_fill', 'resume_generate', 'job_analyze', 'job_collect', 'qa'])
 export const DEFAULT_TTL_MS = 40 * 24 * 60 * 60 * 1000
@@ -22,6 +22,11 @@ export function json(data, status = 200) {
   })
 }
 export function nowMs() { return Date.now() }
+export function clampInt(value, min, max, fallback) {
+  const n = parseInt(value, 10)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
 export function rateBucket(now, windowSec = 60) {
   return Math.floor(now / 1000 / windowSec) * windowSec
 }
@@ -31,12 +36,6 @@ export function extendExpiry(currentMs, now = nowMs(), addMs = EXTEND_MS) {
 }
 export function isShareActive(meta, now = nowMs()) {
   return !!meta && meta.status === 'active' && (!meta.expires_at || now <= Number(meta.expires_at))
-}
-
-export function clampInt(value, min, max, fallback) {
-  const n = parseInt(value, 10)
-  if (!Number.isFinite(n)) return fallback
-  return Math.max(min, Math.min(max, n))
 }
 
 // ---------- KV ----------
@@ -107,7 +106,7 @@ export async function incrementShareCounters(env, id, { view = false, ask = fals
   } catch {}
 }
 
-// ---------- ?????D1 + KV ??? / ???????? ----------
+// ---------- 分享读取（D1 + KV 双保险 / 旧数据惰性迁移） ----------
 export async function getShare(env, id) {
   const payload = await kvGet(env, id)
   let meta = await getShareMeta(env, id)
@@ -145,7 +144,7 @@ export async function migrateLegacy(env, id, payload) {
   } catch { return null }
 }
 
-// ---------- ?? ----------
+// ---------- 事件 ----------
 export async function recordEvent(env, { deviceId, eventName, shareId, feature, value, extra, ts }) {
   if (!hasDb(env)) return
   const t = ts || nowMs()
@@ -165,7 +164,7 @@ export async function recordEvent(env, { deviceId, eventName, shareId, feature, 
   } catch {}
 }
 
-// ---------- ?? ----------
+// ---------- 限流 ----------
 export async function checkRateLimit(env, deviceId, limit, windowSec = 60) {
   if (!hasDb(env)) return { allowed: true, count: 0 }
   const device = String(deviceId || 'unknown').slice(0, 100)
@@ -179,7 +178,7 @@ export async function checkRateLimit(env, deviceId, limit, windowSec = 60) {
   } catch { return { allowed: true, count: 0 } }
 }
 
-// ---------- AI ?? ----------
+// ---------- AI 用量 ----------
 export async function getDailyTokens(env) {
   if (!hasDb(env)) return 0
   const dayStart = new Date()
@@ -194,7 +193,7 @@ export function dailyTokenCap(env) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : AI_DAILY_TOKEN_CAP_DEFAULT
 }
 
-// ---------- ???90 ????2 ????? ----------
+// ---------- 清理（90 天事件、2 天限流桶） ----------
 export async function cleanupOldData(env) {
   if (!hasDb(env)) return
   const cutoff = nowMs() - EVENT_RETENTION_MS

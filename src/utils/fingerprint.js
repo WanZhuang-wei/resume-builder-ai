@@ -1,4 +1,4 @@
-// ????????????????SHA-256 ??? 32 ??
+// 分享内容指纹：稳定链接复用依据（SHA-256 摘要前 32 位）
 export async function computeFingerprint(shareData) {
   try {
     if (!globalThis.crypto || !globalThis.crypto.subtle) return ''

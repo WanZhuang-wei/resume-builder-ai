@@ -1,4 +1,4 @@
-// ????????? ID + ???????????????
+// 匿名埋点：本地设备 ID + 批量上报（默认仅生产环境启用）
 const DEVICE_KEY = 'resume_device_id'
 const QUEUE_KEY = 'resume_tracker_queue'
 const EVENT_WHITELIST = ['app_open', 'feature_use', 'share_create', 'share_view', 'share_ask', 'ai_request']
@@ -23,7 +23,7 @@ function saveQueue() {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-100)))
   } catch {
-    // localStorage ??????
+    // localStorage 不可用时忽略
   }
 }
 
@@ -101,7 +101,7 @@ export function flush() {
       keepalive: true,
     }).catch(() => {})
   } catch {
-    // ?????????
+    // 上报失败不阻塞业务
   }
 }
 

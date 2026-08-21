@@ -1,4 +1,4 @@
-// POST /api/events ? ??????????????????????
+// POST /api/events — 匿名事件批量上报（白名单校验，不落简历内容）
 import { cors, json, EVENT_WHITELIST, FEATURE_WHITELIST, recordEvent, checkRateLimit } from '../_shared.js'
 
 export async function onRequestOptions() {
@@ -7,13 +7,13 @@ export async function onRequestOptions() {
 
 export async function onRequestPost(context) {
   let body
-  try { body = await context.request.json() } catch { return json({ error: '?????' }, 400) }
+  try { body = await context.request.json() } catch { return json({ error: '请求体无效' }, 400) }
   const deviceId = String(body.deviceId || '').slice(0, 100)
   const events = Array.isArray(body.events) ? body.events.slice(0, 20) : []
-  if (events.length === 0) return json({ error: '????' }, 400)
+  if (events.length === 0) return json({ error: '缺少事件' }, 400)
 
   const rate = await checkRateLimit(context.env, deviceId || 'anon', 300)
-  if (!rate.allowed) return json({ error: '????????' }, 429)
+  if (!rate.allowed) return json({ error: '事件上报过于频繁' }, 429)
 
   let inserted = 0
   for (const ev of events) {

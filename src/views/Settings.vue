@@ -53,14 +53,14 @@
     </div>
 
     <div class="section-card">
-      <div class="section-title">????</div>
+      <div class="section-title">操作日志</div>
       <div class="log-actions">
-        <van-button size="small" plain round icon="down" @click="handleExportActionLogs">?? JSON</van-button>
-        <van-button size="small" plain round icon="description" @click="handleExportActionLogsMarkdown">?? Markdown</van-button>
-        <van-button v-if="actionLogs.length" size="small" plain round type="danger" icon="delete" @click="handleClearActionLogs">??</van-button>
-        <van-button size="small" plain round icon="replay" @click="refreshActionLogs">??</van-button>
+        <van-button size="small" plain round icon="down" @click="handleExportActionLogs">导出 JSON</van-button>
+        <van-button size="small" plain round icon="description" @click="handleExportActionLogsMarkdown">导出 Markdown</van-button>
+        <van-button v-if="actionLogs.length" size="small" plain round type="danger" icon="delete" @click="handleClearActionLogs">清空</van-button>
+        <van-button size="small" plain round icon="replay" @click="refreshActionLogs">刷新</van-button>
       </div>
-      <div v-if="actionLogs.length === 0" class="empty-state"><p>?????????????????</p></div>
+      <div v-if="actionLogs.length === 0" class="empty-state"><p>还没有操作日志记录</p></div>
       <van-cell-group v-else :border="false">
         <van-cell v-for="log in actionLogs.slice(0, 20)" :key="log.id" :title="log.action" :label="formatLogMeta(log)" />
       </van-cell-group>
@@ -223,29 +223,29 @@ function formatLogMeta(log) {
 function handleExportActionLogs() {
   try {
     downloadFile(exportLogs('json'), 'action-log-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json')
-    showSuccessToast('???????')
+    showSuccessToast('操作日志已导出')
   } catch (e) {
-    showFailToast('?????' + e.message)
+    showFailToast('导出失败：' + e.message)
   }
 }
 
 function handleExportActionLogsMarkdown() {
   try {
     downloadFile(exportLogs('markdown'), 'action-log-' + new Date().toISOString().slice(0, 10) + '.md', 'text/markdown')
-    showSuccessToast('Markdown ???')
+    showSuccessToast('Markdown 已导出')
   } catch (e) {
-    showFailToast('?????' + e.message)
+    showFailToast('导出失败：' + e.message)
   }
 }
 
 function handleClearActionLogs() {
   showConfirmDialog({
-    title: '??????',
-    message: '???????????????????'
+    title: '清空操作日志',
+    message: '确定要清空所有操作日志吗？此操作不可恢复。'
   }).then(() => {
     clearLogs()
     refreshActionLogs()
-    showSuccessToast('?????')
+    showSuccessToast('已清空')
   }).catch(() => {})
 }
 
