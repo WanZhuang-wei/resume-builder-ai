@@ -26,9 +26,10 @@
 - Pages 项目 Secret：`DEEPSEEK_API_KEY`（主站 production，`wrangler pages secret put` 方式）
 - KV：`SHARES_KV`（分享简历内容 payload；key = `share:{id}`，创建/延期时带绝对过期时间）
 - **D1**：`resume-metrics`（ID `cca23504-3dff-456d-9407-cc4816a88f88`），4 张表：`shares / events / devices / rate_limits`（schema 见 `db/schema.sql`）
-- **待完成（需用户手动，两个自动化通道被安全策略拦截）**：
-  1. DNS 记录：CNAME `admin` → `resume-admin-82d.pages.dev`（Proxied，TTL Auto）
-  2. Zero Trust Access：应用覆盖 `admin.weisresume.cn`，One-time PIN 登录，策略仅允许 `3519543133@qq.com`（免费版 50 用户内）
+- 管理后台登录：**用户名 + 密码**（B 方案，未启用 Zero Trust 支付流程）
+  - 用户名：`weisadmin`（Secret：`ADMIN_USERNAME`）
+  - 密码：已通过 `wrangler pages secret put ADMIN_PASSWORD` 设置（登录后 7 天有效，可退出）
+  - 修改密码：`echo "新密码" | npx wrangler pages secret put ADMIN_PASSWORD --project-name resume-admin`（需在 admin/ 目录或指定配置）
 
 ## 4. 服务端 API（Cloudflare Pages Functions）
 | 接口 | 说明 |
@@ -41,7 +42,7 @@
 | `GET/POST /api/share/:id/manage` | 管理：重置/上限/延期(30天)/撤销/删除（需 manageToken） |
 | `POST /api/ai/chat` | 通用 AI 代理（限流 30 次/分 + 每日 token 上限 + 用量记录） |
 | `POST /api/events` | 匿名事件批量上报（白名单：app_open/feature_use/share_create/share_view/share_ask/ai_request） |
-| 管理端 API（admin 项目，Access 保护 + Cf-Access 头校验） | `GET /api/admin/summary`、`GET /api/admin/shares`、`POST /api/admin/shares/:id/{revoke|extend|delete}`、`GET /api/admin/ai/usage`、`GET /api/admin/export/shares.csv` |
+| 管理端 API（admin 项目，Bearer Token 校验） | `POST /api/admin/login`（用户名密码→7天Token）、`POST /api/admin/logout`、`GET /api/admin/summary`、`GET /api/admin/shares`、`POST /api/admin/shares/:id/{revoke|extend|delete}`、`GET /api/admin/ai/usage`、`GET /api/admin/export/shares.csv` |
 
 EdgeOne 侧同步：`cloud-functions/api/ai/chat.js` + `.edgeone/cloud-functions/api-node/config.json`（尚未部署启用）。
 
@@ -81,7 +82,7 @@ npx wrangler pages deploy dist --project-name resume-admin --branch main
 - 本次 v1 待提交：D1/分享生命周期/埋点/我的分享/admin 子项目/文档
 
 ## 8. 待办
-- **用户手动（Cloudflare 控制台，约 2 分钟）**：①DNS 加 CNAME `admin` → `resume-admin-82d.pages.dev`；②Zero Trust Access 保护 `admin.weisresume.cn`（One-time PIN，仅本人邮箱）
+- 管理后台：`admin.weisresume.cn` 已生效（DNS CNAME + Pages 自定义域名）；登录用户名 `weisadmin` + 密码（Secret `ADMIN_PASSWORD`，7 天会话，IP 10 次/10分钟限流防爆破）
 - ICP 备案通过后如需切 EdgeOne：临时关闭禁止更新锁（需微信扫码验证）→ NS 改回 DNSPod → EdgeOne 绑定 weisresume.cn
 - `www.weisresume.cn` 未配置（可选：加 CNAME + 跳转）
 - 自动续费未开（腾讯云域名控制台可开）

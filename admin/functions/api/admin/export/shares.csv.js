@@ -2,7 +2,7 @@
 import { requireAdmin } from '../../../_admin.js'
 
 export async function onRequestGet(context) {
-  if (!requireAdmin(context)) {
+  if (!(await requireAdmin(context))) {
     return new Response(JSON.stringify({ error: '未授权' }), { status: 401, headers: { 'Content-Type': 'application/json; charset=UTF-8' } })
   }
   const db = context.env.ANALYTICS_DB

@@ -2,7 +2,7 @@
 import { json, requireAdmin, EXTEND_MS, kvGet, kvPut, kvDelete, extendExpiry } from '../../../../_admin.js'
 
 export async function onRequestPost(context) {
-  if (!requireAdmin(context)) return json({ error: '未授权' }, 401)
+  if (!(await requireAdmin(context))) return json({ error: '未授权' }, 401)
   const id = context.params.id
   const action = context.params.action
   if (!['revoke', 'extend', 'delete'].includes(action)) return json({ error: '无效操作' }, 400)

@@ -1,26 +1,39 @@
 <template>
   <div class="admin-app">
-    <header class="topbar">
-      <div class="brand">简历生成助手 · 管理后台</div>
-      <a class="back-link" href="https://weisresume.cn" target="_blank" rel="noopener">主站 →</a>
-    </header>
-    <nav class="tabs">
-      <button :class="{ active: view === 'dashboard' }" @click="view = 'dashboard'">数据看板</button>
-      <button :class="{ active: view === 'shares' }" @click="view = 'shares'">分享管理</button>
-    </nav>
-    <main class="content">
-      <Dashboard v-if="view === 'dashboard'" />
-      <Shares v-else />
-    </main>
+    <Login v-if="!authed" />
+    <template v-else>
+      <header class="topbar">
+        <div class="brand">简历生成助手 · 管理后台</div>
+        <div class="top-actions">
+          <a class="back-link" href="https://weisresume.cn" target="_blank" rel="noopener">主站 →</a>
+          <button class="logout-btn" @click="doLogout">退出登录</button>
+        </div>
+      </header>
+      <nav class="tabs">
+        <button :class="{ active: view === 'dashboard' }" @click="view = 'dashboard'">数据看板</button>
+        <button :class="{ active: view === 'shares' }" @click="view = 'shares'">分享管理</button>
+      </nav>
+      <main class="content">
+        <Dashboard v-if="view === 'dashboard'" />
+        <Shares v-else />
+      </main>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { authed, logout } from './auth'
+import Login from './views/Login.vue'
 import Dashboard from './views/Dashboard.vue'
 import Shares from './views/Shares.vue'
 
 const view = ref('dashboard')
+
+async function doLogout() {
+  await logout()
+  view.value = 'dashboard'
+}
 </script>
 
 <style>
@@ -35,7 +48,10 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 24px; background: #1a1a2e; color: #fff; font-weight: 600;
 }
+.top-actions { display: flex; align-items: center; gap: 14px; }
 .back-link { color: #7cc4ff; font-size: 13px; text-decoration: none; }
+.logout-btn { border: 1px solid #555; background: transparent; color: #ccc; padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.logout-btn:hover { color: #fff; border-color: #888; }
 .tabs {
   display: flex; gap: 8px; padding: 12px 24px; background: #fff;
   border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 10;

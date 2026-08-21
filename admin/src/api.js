@@ -1,5 +1,15 @@
+import { authHeaders, setToken } from './auth'
+
 async function request(path, options) {
-  const res = await fetch(path, options)
+  const res = await fetch(path, {
+    ...options,
+    headers: { ...(options && options.headers), ...authHeaders() },
+  })
+  if (res.status === 401) {
+    // 会话失效/未登录 → 清空本地 token，回到登录页
+    setToken('')
+    throw new Error('未登录或登录已过期')
+  }
   if (!res.ok) {
     const d = await res.json().catch(() => ({}))
     throw new Error(d.error || ('HTTP ' + res.status))

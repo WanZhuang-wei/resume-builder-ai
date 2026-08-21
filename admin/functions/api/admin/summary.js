@@ -2,7 +2,7 @@
 import { json, requireAdmin, cleanupOldData, clampInt } from '../../_admin.js'
 
 export async function onRequestGet(context) {
-  if (!requireAdmin(context)) return json({ error: '未授权' }, 401)
+  if (!(await requireAdmin(context))) return json({ error: '未授权' }, 401)
   await cleanupOldData(context.env)
   const db = context.env.ANALYTICS_DB
   const url = new URL(context.request.url)

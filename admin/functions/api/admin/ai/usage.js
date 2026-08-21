@@ -2,7 +2,7 @@
 import { json, requireAdmin, clampInt } from '../../../_admin.js'
 
 export async function onRequestGet(context) {
-  if (!requireAdmin(context)) return json({ error: '未授权' }, 401)
+  if (!(await requireAdmin(context))) return json({ error: '未授权' }, 401)
   const db = context.env.ANALYTICS_DB
   const days = clampInt(new URL(context.request.url).searchParams.get('days'), 1, 90, 14)
   const since = Date.now() - days * 24 * 60 * 60 * 1000
