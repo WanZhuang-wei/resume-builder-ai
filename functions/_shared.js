@@ -90,6 +90,12 @@ export async function updateShare(env, id, fields) {
     if (fields.sessions !== undefined) {
       await env.ANALYTICS_DB.prepare('UPDATE shares SET sessions = ?, max_questions = ? WHERE id = ?')
         .bind(JSON.stringify(fields.sessions), fields.maxQuestions || DEFAULT_MAX_QUESTIONS, id).run()
+    } else if (fields.maxQuestions !== undefined) {
+      // 仅更新上限：绝不触碰 sessions，避免误清空提问记录
+      await env.ANALYTICS_DB.prepare('UPDATE shares SET max_questions = ? WHERE id = ?').bind(fields.maxQuestions, id).run()
+    }
+    if (fields.askCount !== undefined) {
+      await env.ANALYTICS_DB.prepare('UPDATE shares SET ask_count = ? WHERE id = ?').bind(fields.askCount, id).run()
     }
   } catch {}
 }

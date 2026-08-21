@@ -68,25 +68,43 @@ export async function onRequestPost(context) {
     return json({ ok: true, expiresAt: new Date(next).toISOString() })
   }
 
-  // 次数/上限管理
-  let changed = false
-  if (body.resetAll === true) { sessions.splice(0); changed = true }
-  else if (body.resetHrKey) {
-    const idx = sessions.findIndex(s => s.hrKey === String(body.resetHrKey))
-    if (idx >= 0) { sessions.splice(idx, 1); changed = true }
+  // 次数/上限管理：重置只清零次数（保留记录），更新上限绝不触碰记录
+  let sessionsChanged = false
+  let maxChanged = false
+  let askCount = null
+
+  if (body.resetAll === true) {
+    for (const s of sessions) s.count = 0
+    askCount = 0
+    sessionsChanged = true
+  } else if (body.resetHrKey) {
+    const target = sessions.find(s => s.hrKey === String(body.resetHrKey))
+    if (target) {
+      target.count = 0
+      sessionsChanged = true
+      askCount = sessions.reduce((sum, s) => sum + (s.count || 0), 0)
+    }
   }
   if (body.maxQuestions !== undefined) {
     const max = clampInt(body.maxQuestions, 1, 100, DEFAULT_MAX_QUESTIONS)
-    if (max !== maxQuestions) { maxQuestions = max; changed = true }
+    if (max !== maxQuestions) { maxQuestions = max; maxChanged = true }
   }
-  if (changed) {
+
+  if (sessionsChanged || maxChanged) {
     if (share.meta) {
-      await updateShare(context.env, id, { sessions, maxQuestions })
+      await updateShare(context.env, id, {
+        sessions: sessionsChanged ? sessions : undefined,
+        maxQuestions,
+        askCount: askCount === null ? undefined : askCount,
+      })
     } else if (share.payload) {
-      share.payload.sessions = sessions
+      if (sessionsChanged) share.payload.sessions = sessions
       share.payload.maxQuestions = maxQuestions
       await kvPut(context.env, id, share.payload)
     }
+    // 操作后重新读取最新数据，避免返回旧状态
+    const fresh = await getShare(context.env, id)
+    if (fresh.meta) return json(buildResponse(fresh, id))
   }
   return json(buildResponse(share, id))
 }
